@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { motion } from "framer-motion";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -26,7 +28,12 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="fixed top-0 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+      <motion.div
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="fixed top-0 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50"
+      >
         <div className="container flex h-14 items-center">
           <div
             className="flex items-center space-x-2 font-bold cursor-pointer"
@@ -46,6 +53,7 @@ export default function LandingPage() {
             <Button variant="ghost" onClick={() => navigate("/about")}>
               About
             </Button>
+            <ThemeToggle />
             {user ? (
               <Button variant="outline" onClick={() => navigate("/app")}>
                 Dashboard
@@ -60,7 +68,7 @@ export default function LandingPage() {
             )}
           </nav>
         </div>
-      </header>
+      </motion.div>
 
       <main>
         <Hero onGetStarted={handleGetStarted} />

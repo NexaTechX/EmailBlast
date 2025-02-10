@@ -7,12 +7,17 @@ import AuthPage from "./pages/auth";
 import PricingPage from "./pages/pricing";
 import AboutPage from "./pages/about";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "./components/ui/toaster";
 import { AppLayout } from "./components/layout/app-layout";
 import { DashboardOverview } from "./components/dashboard/dashboard-overview";
 import { CampaignList } from "./components/campaign/campaign-list";
 import { SubscriberLists } from "./components/subscriber/subscriber-list";
 import { AnalyticsDashboard } from "./components/analytics/analytics-dashboard";
+import { SettingsLayout } from "./components/settings/settings-layout";
+import { ProfileSettings } from "./components/settings/profile-settings";
+import { SubscriptionSettings } from "./components/settings/subscription-settings";
+import { PreferencesSettings } from "./components/settings/preferences-settings";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -30,9 +35,10 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <Suspense fallback={<p>Loading...</p>}>
-        <>
+    <ThemeProvider defaultTheme="system" storageKey="ui-theme">
+      <AuthProvider>
+        <Suspense fallback={<p>Loading...</p>}>
+          {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
@@ -64,17 +70,27 @@ function App() {
                           <AnalyticsDashboard campaignId="placeholder" />
                         }
                       />
+                      <Route path="/settings" element={<SettingsLayout />}>
+                        <Route index element={<ProfileSettings />} />
+                        <Route
+                          path="subscription"
+                          element={<SubscriptionSettings />}
+                        />
+                        <Route
+                          path="preferences"
+                          element={<PreferencesSettings />}
+                        />
+                      </Route>
                     </Routes>
                   </AppLayout>
                 </PrivateRoute>
               }
             />
           </Routes>
-          {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
           <Toaster />
-        </>
-      </Suspense>
-    </AuthProvider>
+        </Suspense>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

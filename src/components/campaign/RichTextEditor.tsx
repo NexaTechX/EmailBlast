@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
   Bold,
   Italic,
@@ -10,12 +12,13 @@ import {
   AlignCenter,
   AlignRight,
   List,
-  Link,
-  Image,
+  Link as LinkIcon,
+  Image as ImageIcon,
   Code,
+  Undo,
+  Redo,
 } from "lucide-react";
 import { Separator } from "../ui/separator";
-import { Textarea } from "../ui/textarea";
 
 interface RichTextEditorProps {
   content?: string;
@@ -23,81 +26,140 @@ interface RichTextEditorProps {
 }
 
 const RichTextEditor = ({
-  content = "<p>Enter your email content here...</p>",
-  onChange,
+  content = "<p>Start composing your email...</p>",
+  onChange = () => {},
 }: RichTextEditorProps) => {
-  const [activeTab, setActiveTab] = useState("visual");
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Image,
+      Link.configure({
+        openOnClick: false,
+      }),
+    ],
+    content,
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+  });
 
-  const handleContentChange = (newContent: string) => {
-    onChange?.(newContent);
+  const addImage = () => {
+    const url = window.prompt("Enter image URL");
+    if (url && editor) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
   };
 
+  const addLink = () => {
+    const url = window.prompt("Enter URL");
+    if (url && editor) {
+      editor.chain().focus().setLink({ href: url }).run();
+    }
+  };
+
+  if (!editor) return null;
+
   return (
-    <Card className="w-full h-full bg-white p-4 flex flex-col gap-4">
-      <div className="flex items-center gap-2 pb-2">
-        <Tabs
-          defaultValue="visual"
-          className="w-full"
-          onValueChange={setActiveTab}
+    <Card className="w-full h-full bg-background">
+      <div className="flex items-center gap-2 p-2 border-b">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().undo().run()}
+          disabled={!editor.can().undo()}
         >
-          <TabsList className="grid w-[200px] grid-cols-2">
-            <TabsTrigger value="visual">Visual</TabsTrigger>
-            <TabsTrigger value="html">HTML</TabsTrigger>
-          </TabsList>
+          <Undo className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().redo().run()}
+          disabled={!editor.can().redo()}
+        >
+          <Redo className="h-4 w-4" />
+        </Button>
+        <Separator orientation="vertical" className="mx-2 h-6" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          data-active={editor.isActive("bold")}
+        >
+          <Bold className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          data-active={editor.isActive("italic")}
+        >
+          <Italic className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          data-active={editor.isActive("strike")}
+        >
+          <Underline className="h-4 w-4" />
+        </Button>
+        <Separator orientation="vertical" className="mx-2 h-6" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          data-active={editor.isActive({ textAlign: "left" })}
+        >
+          <AlignLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          data-active={editor.isActive({ textAlign: "center" })}
+        >
+          <AlignCenter className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          data-active={editor.isActive({ textAlign: "right" })}
+        >
+          <AlignRight className="h-4 w-4" />
+        </Button>
+        <Separator orientation="vertical" className="mx-2 h-6" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          data-active={editor.isActive("bulletList")}
+        >
+          <List className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={addLink}
+          data-active={editor.isActive("link")}
+        >
+          <LinkIcon className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={addImage}>
+          <ImageIcon className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          data-active={editor.isActive("codeBlock")}
+        >
+          <Code className="h-4 w-4" />
+        </Button>
+      </div>
 
-          <div className="flex items-center gap-2 mt-4">
-            <Button variant="outline" size="icon">
-              <Bold className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Italic className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Underline className="h-4 w-4" />
-            </Button>
-            <Separator orientation="vertical" className="mx-2 h-6" />
-            <Button variant="outline" size="icon">
-              <AlignLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <AlignCenter className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <AlignRight className="h-4 w-4" />
-            </Button>
-            <Separator orientation="vertical" className="mx-2 h-6" />
-            <Button variant="outline" size="icon">
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Link className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Image className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <Code className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <TabsContent value="visual" className="mt-4">
-            <Textarea
-              className="min-h-[500px] resize-none"
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              placeholder="Start composing your email..."
-            />
-          </TabsContent>
-
-          <TabsContent value="html" className="mt-4">
-            <Textarea
-              className="min-h-[500px] font-mono resize-none"
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              placeholder="Enter HTML code here..."
-            />
-          </TabsContent>
-        </Tabs>
+      <div className="p-4 min-h-[500px] prose prose-sm max-w-none">
+        <EditorContent editor={editor} />
       </div>
     </Card>
   );
