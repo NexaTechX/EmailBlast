@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { Crown, Check } from "lucide-react";
 import { createCheckoutSession } from "@/lib/creem";
@@ -10,7 +9,7 @@ const plans = [
   {
     name: "Free",
     price: "$0",
-    priceId: "price_free",
+    productId: "prod_free", // Replace with your actual Creem product ID
     features: [
       "Up to 500 subscribers",
       "1,000 emails per month",
@@ -21,7 +20,7 @@ const plans = [
   {
     name: "Pro",
     price: "$29",
-    priceId: "price_pro",
+    productId: "prod_pro", // Replace with your actual Creem product ID
     features: [
       "Up to 5,000 subscribers",
       "20,000 emails per month",
@@ -34,7 +33,7 @@ const plans = [
   {
     name: "Enterprise",
     price: "$99",
-    priceId: "price_enterprise",
+    productId: "prod_enterprise", // Replace with your actual Creem product ID
     features: [
       "Unlimited subscribers",
       "Unlimited emails",
@@ -58,11 +57,10 @@ export function SubscriptionSettings() {
       if (!plan) throw new Error("Invalid plan");
 
       await createCheckoutSession({
-        priceId: plan.priceId,
-        successUrl: `${window.location.origin}/app/settings/subscription?success=true`,
-        cancelUrl: `${window.location.origin}/app/settings/subscription?canceled=true`,
+        productId: plan.productId,
       });
     } catch (error) {
+      console.error("Error:", error);
       toast({
         variant: "destructive",
         title: "Error",
