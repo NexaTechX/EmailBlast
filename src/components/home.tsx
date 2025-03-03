@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import CampaignHeader from "./campaign/CampaignHeader";
-import CampaignEditor from "./campaign/CampaignEditor";
-import CampaignPreview from "./campaign/CampaignPreview";
+import EnhancedCampaignEditor from "./campaign/enhanced-campaign-editor";
+import { useToast } from "./ui/use-toast";
 
 interface CampaignState {
   title: string;
@@ -15,6 +15,7 @@ interface CampaignState {
 }
 
 const Home = () => {
+  const { toast } = useToast();
   const [campaign, setCampaign] = useState<CampaignState>({
     title: "Untitled Campaign",
     content: "<p>Start composing your email campaign...</p>",
@@ -38,29 +39,40 @@ const Home = () => {
     setCampaign((prev) => ({ ...prev, details: newDetails }));
   };
 
+  const handleSaveDraft = () => {
+    // Save draft logic would go here
+    toast({
+      title: "Draft Saved",
+      description: "Your campaign draft has been saved successfully.",
+    });
+  };
+
+  const handleSchedule = () => {
+    // Schedule logic is handled in the CampaignHeader component
+  };
+
+  const handleSend = () => {
+    // Send logic is handled in the CampaignHeader component
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       <CampaignHeader
         title={campaign.title}
         onTitleChange={handleTitleChange}
-        onSaveDraft={() => console.log("Saving draft...")}
-        onSchedule={() => console.log("Opening schedule dialog...")}
-        onSend={() => console.log("Sending campaign...")}
+        onSaveDraft={handleSaveDraft}
+        onSchedule={handleSchedule}
+        onSend={handleSend}
+        campaign={campaign}
       />
 
       <div className="flex h-[calc(100vh-72px)]">
-        <div className="w-1/2 border-r border-gray-200">
-          <CampaignEditor
+        <div className="w-full border-r border-gray-200">
+          <EnhancedCampaignEditor
             onContentChange={handleContentChange}
             onDetailsChange={handleDetailsChange}
             initialContent={campaign.content}
             initialDetails={campaign.details}
-          />
-        </div>
-        <div className="w-1/2">
-          <CampaignPreview
-            content={campaign.content}
-            subject={campaign.details.subject}
           />
         </div>
       </div>

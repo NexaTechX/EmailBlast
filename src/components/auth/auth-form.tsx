@@ -3,15 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Mail } from "lucide-react";
-import { useAuth } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
-
-type AuthMode = "login" | "register";
+import { useAuth } from "@/lib/auth";
 
 export function AuthForm() {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,16 +22,21 @@ export function AuthForm() {
     try {
       if (mode === "login") {
         await signIn(email, password);
+        navigate("/app");
       } else {
         await signUp(email, password);
+        toast({
+          title: "Account created",
+          description:
+            "Please check your email for a confirmation link to verify your account.",
+        });
       }
-      navigate("/app");
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Authentication error:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "An error occurred",
+        title: "Authentication failed",
+        description: error.message || "An error occurred during authentication",
       });
     } finally {
       setLoading(false);
@@ -43,78 +44,63 @@ export function AuthForm() {
   };
 
   return (
-    <Card className="w-[400px] p-6">
-      <form onSubmit={handleSubmit} className="flex flex-col space-y-6">
-        <div className="flex flex-col space-y-2 text-center">
-          <div className="flex justify-center">
-            <div className="rounded-full bg-primary/10 p-3">
-              <Mail className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {mode === "login" ? "Welcome back" : "Create an account"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {mode === "login"
-              ? "Enter your email to sign in to your account"
-              : "Enter your email below to create your account"}
-          </p>
+    <div className="grid gap-6">
+      <div className="flex flex-col space-y-2 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {mode === "login" ? "Sign in to your account" : "Create an account"}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {mode === "login"
+            ? "Enter your email below to sign in to your account"
+            : "Enter your email below to create your account"}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="m@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              placeholder="m@example.com"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoCapitalize="none"
-              autoComplete="email"
-              autoCorrect="off"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoCapitalize="none"
-              autoComplete="current-password"
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Loading..." : mode === "login" ? "Sign In" : "Sign Up"}
-          </Button>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
         </div>
 
-        <div className="text-center text-sm">
-          {mode === "login" ? (
-            <Button
-              type="button"
-              variant="link"
-              className="text-primary"
-              onClick={() => setMode("register")}
-            >
-              Don't have an account? Sign up
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="link"
-              className="text-primary"
-              onClick={() => setMode("login")}
-            >
-              Already have an account? Sign in
-            </Button>
-          )}
-        </div>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading
+            ? "Loading..."
+            : mode === "login"
+              ? "Sign In"
+              : "Create Account"}
+        </Button>
       </form>
-    </Card>
+
+      <div className="text-center">
+        <Button
+          type="button"
+          variant="link"
+          className="text-sm text-muted-foreground"
+          onClick={() => setMode(mode === "login" ? "register" : "login")}
+        >
+          {mode === "login"
+            ? "Don't have an account? Sign up"
+            : "Already have an account? Sign in"}
+        </Button>
+      </div>
+    </div>
   );
 }

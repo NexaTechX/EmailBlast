@@ -3,6 +3,8 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Monitor, Smartphone } from "lucide-react";
+import { useToast } from "../ui/use-toast";
+import { sendTestEmail } from "@/lib/brevo";
 
 interface CampaignPreviewProps {
   content?: string;
@@ -14,6 +16,53 @@ const CampaignPreview = ({
   subject = "Sample Email Campaign",
 }: CampaignPreviewProps) => {
   const [activeView, setActiveView] = useState("desktop");
+  const [testEmail, setTestEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const { toast } = useToast();
+
+  const handleSendTest = async () => {
+    if (!testEmail) {
+      toast({
+        title: "Error",
+        description: "Please enter a test email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSending(true);
+    try {
+      await sendTestEmail(
+        {
+          id: "preview",
+          title: "Test Email",
+          subject: subject,
+          content: content,
+          sender_name: "Test Sender",
+          sender_email: "test@example.com",
+          status: "draft",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          list_id: "test",
+        },
+        testEmail,
+      );
+
+      toast({
+        title: "Success",
+        description: "Test email sent successfully",
+      });
+    } catch (error) {
+      console.error("Error sending test email:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send test email",
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <Card className="w-full h-full bg-white p-4 flex flex-col gap-4">
@@ -65,7 +114,18 @@ const CampaignPreview = ({
       </div>
 
       <div className="flex justify-end gap-2 pt-4 border-t">
-        <Button variant="outline">Send Test Email</Button>
+        <div className="flex-1">
+          <input
+            type="email"
+            placeholder="Enter test email address"
+            className="w-full px-3 py-2 border rounded-md"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+          />
+        </div>
+        <Button variant="outline" onClick={handleSendTest} disabled={sending}>
+          {sending ? "Sending..." : "Send Test Email"}
+        </Button>
         <Button variant="outline">Download Preview</Button>
       </div>
     </Card>

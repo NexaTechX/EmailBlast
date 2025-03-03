@@ -18,21 +18,41 @@ export function ProfileSettings() {
   });
 
   useEffect(() => {
-    loadProfile();
-  }, []);
+    if (user?.id) {
+      loadProfile();
+    }
+  }, [user?.id]);
 
   const loadProfile = async () => {
     try {
+      // First check if the profiles table exists
+      const { error: tableCheckError } = await supabase
+        .from("profiles")
+        .select("count")
+        .limit(1);
+
+      // If the table doesn't exist, create a default profile in memory
+      if (tableCheckError && tableCheckError.code === "42P01") {
+        console.log("Profiles table does not exist yet, using default profile");
+        return;
+      }
+
+      // If the table exists, try to get the user's profile
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user?.id)
         .single();
 
-      if (error) throw error;
+      if (error && error.code !== "PGRST116") throw error;
       if (data) setProfile(data);
     } catch (error) {
       console.error("Error loading profile:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load profile. Please try again later.",
+      });
     }
   };
 
@@ -41,6 +61,24 @@ export function ProfileSettings() {
     setLoading(true);
 
     try {
+      // First check if the profiles table exists
+      const { error: tableCheckError } = await supabase
+        .from("profiles")
+        .select("count")
+        .limit(1);
+
+      // If the table doesn't exist, show a message to run the SQL script
+      if (tableCheckError && tableCheckError.code === "42P01") {
+        toast({
+          variant: "destructive",
+          title: "Database Setup Required",
+          description:
+            "Please run the SQL script to create the profiles table first.",
+        });
+        return;
+      }
+
+      // If the table exists, update the profile
       const { error } = await supabase
         .from("profiles")
         .upsert({ id: user?.id, ...profile });
@@ -52,10 +90,11 @@ export function ProfileSettings() {
         description: "Profile updated successfully",
       });
     } catch (error) {
+      console.error("Error updating profile:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update profile",
+        description: "Failed to update profile. Please try again later.",
       });
     } finally {
       setLoading(false);

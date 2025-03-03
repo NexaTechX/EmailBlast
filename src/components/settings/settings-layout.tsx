@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
-import { User, CreditCard, Settings } from "lucide-react";
+import { User, CreditCard, Settings, Shield, Users } from "lucide-react";
 
 const settingsNav = [
   {
@@ -18,6 +18,16 @@ const settingsNav = [
     title: "Preferences",
     href: "/app/settings/preferences",
     icon: Settings,
+  },
+  {
+    title: "Security",
+    href: "/app/settings/security",
+    icon: Shield,
+  },
+  {
+    title: "Team",
+    href: "/app/settings/team",
+    icon: Users,
   },
 ];
 
