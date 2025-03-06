@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Routes, Route, useRoutes, Navigate } from "react-router-dom";
 import routes from "tempo-routes";
 import Home from "./components/home";
@@ -26,6 +26,8 @@ import { MobileAppPreview } from "./components/mobile/mobile-app-preview";
 import { SEOOptimization } from "./components/seo/seo-optimization";
 import { ComplianceChecker } from "./components/compliance/compliance-checker";
 import { ABTestingTool } from "./components/ab-testing/ab-testing-tool";
+import { LeadFinderTool } from "./components/lead-finder/lead-finder-tool";
+import { setupDatabase } from "./lib/database-setup";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isEmailVerified } = useAuth();
@@ -45,6 +47,17 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  useEffect(() => {
+    // Set up database tables when the app loads
+    setupDatabase().then((success) => {
+      if (success) {
+        console.log("Database setup completed successfully");
+      } else {
+        console.error("Database setup failed");
+      }
+    });
+  }, []);
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="ui-theme">
       <AuthProvider>
@@ -111,6 +124,7 @@ function App() {
                         element={<ComplianceChecker />}
                       />
                       <Route path="/ab-testing" element={<ABTestingTool />} />
+                      <Route path="/lead-finder" element={<LeadFinderTool />} />
                     </Routes>
                   </AppLayout>
                 </PrivateRoute>

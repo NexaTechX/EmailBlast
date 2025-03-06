@@ -24,10 +24,13 @@ export function CampaignEditor() {
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
+    setHtmlContent(e.target.value); // Sync with HTML view
   };
 
   const handleHtmlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setHtmlContent(e.target.value);
+    // Update the visual content when HTML is changed
+    setContent(e.target.value);
   };
 
   const handleSave = () => {
@@ -74,7 +77,10 @@ export function CampaignEditor() {
         }
         break;
       case "image":
-        const imgUrl = prompt("Enter image URL:", "https://");
+        const imgUrl = prompt(
+          "Enter image URL:",
+          "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
+        );
         if (imgUrl) {
           newText = `<img src="${imgUrl}" alt="Image" style="max-width: 100%" />`;
         } else {
@@ -87,6 +93,7 @@ export function CampaignEditor() {
 
     textarea.value = beforeText + newText + afterText;
     setContent(textarea.value);
+    setHtmlContent(textarea.value); // Sync with HTML view
     textarea.focus();
     textarea.selectionStart = start + newText.length;
     textarea.selectionEnd = start + newText.length;
@@ -172,7 +179,25 @@ export function CampaignEditor() {
           />
 
           <div className="p-4 border rounded-md">
-            <h3 className="text-sm font-medium mb-2">Preview</h3>
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-medium">Preview</h3>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertFormatting("image")}
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" /> Add Image
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertFormatting("link")}
+                >
+                  <LinkIcon className="h-4 w-4 mr-2" /> Add Link
+                </Button>
+              </div>
+            </div>
             <div
               className="prose max-w-none p-4 bg-white rounded-md min-h-[200px]"
               dangerouslySetInnerHTML={{ __html: content }}
@@ -182,6 +207,7 @@ export function CampaignEditor() {
 
         <TabsContent value="html" className="min-h-[500px]">
           <textarea
+            id="html-editor"
             className="w-full h-[500px] font-mono text-sm p-4 border rounded-md"
             placeholder="Enter HTML content..."
             value={htmlContent}

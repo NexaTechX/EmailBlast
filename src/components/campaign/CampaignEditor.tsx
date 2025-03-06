@@ -8,6 +8,7 @@ import CampaignDetailsForm from "./CampaignDetailsForm";
 import RichTextEditor from "./RichTextEditor";
 import CampaignPreview from "./CampaignPreview";
 import { AIContentGenerator } from "../ai/ai-content-generator";
+import { generateContentWithGemini } from "@/lib/gemini-api";
 import { ColdOutreachTools } from "./cold-outreach-tools";
 import { CampaignAutomation } from "./campaign-automation";
 import { SEOOptimization } from "../seo/seo-optimization";
@@ -105,8 +106,10 @@ const CampaignEditor = ({
   };
 
   const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    onContentChange(newContent);
+    if (typeof newContent === "string") {
+      setContent(newContent);
+      onContentChange(newContent);
+    }
   };
 
   const handleDetailsChange = (newDetails: CampaignDetails) => {
@@ -115,9 +118,11 @@ const CampaignEditor = ({
   };
 
   const handleAIContent = (generatedContent: string) => {
+    if (!generatedContent) return;
+
     if (activeTab === "content") {
       handleContentChange(generatedContent);
-    } else if (activeTab === "details" && generatedContent) {
+    } else if (activeTab === "details") {
       handleDetailsChange({
         ...details,
         subject: generatedContent,
@@ -127,10 +132,29 @@ const CampaignEditor = ({
 
   const handleSendTest = async () => {
     try {
+      // Get the email address to send the test to
+      const testEmail = window.prompt(
+        "Enter email address to send test to:",
+        "",
+      );
+
+      if (!testEmail) {
+        return; // User cancelled
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail)) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Email",
+          description: "Please enter a valid email address.",
+        });
+        return;
+      }
+
       // In a real implementation, this would send a test email
       toast({
         title: "Test Email Sent",
-        description: "A test email has been sent to your address.",
+        description: `A test email has been sent to ${testEmail}.`,
       });
     } catch (error) {
       toast({

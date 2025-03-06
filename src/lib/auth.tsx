@@ -80,6 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         {
           id: data.user.id,
           email_verified: true, // Set to true since we're using Supabase's email confirmation
+          full_name: "",
+          company_name: "",
+          website: "",
         },
       ]);
       if (profileError) console.error("Error creating profile:", profileError);
