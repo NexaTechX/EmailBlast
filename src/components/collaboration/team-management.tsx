@@ -249,7 +249,6 @@ export function TeamManagement() {
                                 value as TeamMember["role"],
                               )
                             }
-                            disabled={member.role === "owner"}
                           >
                             <SelectTrigger className="w-[110px]">
                               <SelectValue />

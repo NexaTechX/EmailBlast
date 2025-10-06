@@ -33,8 +33,8 @@ export async function setupDatabase() {
       console.log("Creating database tables...");
 
       // Create tables using the SQL from create_tables.sql
-      await supabase
-        .rpc("exec_sql", {
+      try {
+        await supabase.rpc("exec_sql", {
           sql_string: `
           -- Create profiles table
           CREATE TABLE IF NOT EXISTS public.profiles (
@@ -124,14 +124,14 @@ export async function setupDatabase() {
           ALTER PUBLICATION supabase_realtime ADD TABLE public.campaigns;
           ALTER PUBLICATION supabase_realtime ADD TABLE public.campaign_analytics;
         `,
-        })
-        .catch((err) => {
-          console.error("Error creating tables:", err);
-          // Try creating tables one by one if the batch operation fails
-          createTablesIndividually();
         });
-
-      console.log("Database tables created successfully");
+        console.log("Database tables created successfully");
+      } catch (err) {
+        console.error("Error creating tables:", err);
+        // Try creating tables one by one if the batch operation fails
+        await createTablesIndividually();
+      }
+      
       return true;
     }
 

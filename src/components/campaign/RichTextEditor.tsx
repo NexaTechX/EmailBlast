@@ -2,7 +2,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
-// TextAlign and Placeholder extensions are not installed, using basic functionality instead
+import TextAlign from "@tiptap/extension-text-align";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -60,7 +60,9 @@ const RichTextEditor = ({
       Link.configure({
         openOnClick: false,
       }),
-      // TextAlign and Placeholder extensions would be configured here if installed
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
     ],
     content,
     onUpdate: ({ editor }) => {

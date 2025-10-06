@@ -115,10 +115,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex flex-1 flex-col lg:pl-64">
+      {/* Main content - Pushed to the right on desktop */}
+      <div className="flex flex-1 flex-col lg:ml-64">
         {/* Mobile header */}
-        <div className="sticky top-0 z-40 flex h-16 items-center gap-x-4 border-b bg-background px-4 lg:hidden">
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-background px-4 shadow-sm lg:hidden">
           <Button
             variant="ghost"
             size="icon"
@@ -132,8 +132,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        {/* Main content area */}
         <main className="flex-1">
-          <div className="py-8 px-4 sm:px-8">{children}</div>
+          <div className="py-8 px-4 sm:px-6 lg:px-8">{children}</div>
         </main>
       </div>
     </div>

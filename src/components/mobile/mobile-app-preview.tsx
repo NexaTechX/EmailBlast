@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Smartphone, QrCode, Download, Share2 } from "lucide-react";
+import { Smartphone, QrCode, Download, Share2, Users } from "lucide-react";
 
 export function MobileAppPreview() {
   return (
