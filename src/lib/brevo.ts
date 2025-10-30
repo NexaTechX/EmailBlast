@@ -54,9 +54,19 @@ export async function sendEmail({
 function addTrackingPixel(html: string, campaignId?: string): string {
   if (!campaignId) return html;
 
+  // Brevo has built-in tracking, but we can add our own tracking pixel as well
   const trackingUrl = `${import.meta.env.VITE_APP_URL}/api/track/open?cid=${campaignId}`;
-  const pixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none" />`;
-  return html + pixel;
+  const pixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none" alt="" />`;
+  
+  // Add unsubscribe link at the bottom
+  const unsubscribeLink = `
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280;">
+      <p>You're receiving this email because you subscribed to our mailing list.</p>
+      <p><a href="${import.meta.env.VITE_APP_URL}/unsubscribe?email={{email}}&campaign=${campaignId}" style="color: #3b82f6; text-decoration: underline;">Unsubscribe</a> | <a href="${import.meta.env.VITE_APP_URL}/legal/privacy" style="color: #3b82f6; text-decoration: underline;">Privacy Policy</a></p>
+    </div>
+  `;
+  
+  return html + unsubscribeLink + pixel;
 }
 
 export async function sendCampaign(campaign: Campaign, subscribers: string[]) {

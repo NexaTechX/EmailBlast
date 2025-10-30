@@ -6,6 +6,9 @@ import LandingPage from "./pages/landing";
 import AuthPage from "./pages/auth";
 import PricingPage from "./pages/pricing";
 import AboutPage from "./pages/about";
+import TermsOfService from "./pages/legal/terms";
+import PrivacyPolicy from "./pages/legal/privacy";
+import UnsubscribePage from "./pages/unsubscribe";
 import { AuthProvider, useAuth } from "./lib/auth";
 import AuthCallback from "./pages/auth/callback";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -68,6 +71,9 @@ function App() {
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/legal/terms" element={<TermsOfService />} />
+            <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route
               path="/app/*"

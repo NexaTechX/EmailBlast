@@ -76,6 +76,17 @@ export async function createCampaign(campaign: Partial<Campaign>) {
   return data as Campaign;
 }
 
+export async function getCampaign(id: string) {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) throw error;
+  return data as Campaign;
+}
+
 export async function updateCampaign(id: string, updates: Partial<Campaign>) {
   const { data, error } = await supabase
     .from("campaigns")
@@ -86,6 +97,12 @@ export async function updateCampaign(id: string, updates: Partial<Campaign>) {
 
   if (error) throw error;
   return data as Campaign;
+}
+
+export async function deleteCampaign(id: string) {
+  const { error } = await supabase.from("campaigns").delete().eq("id", id);
+
+  if (error) throw error;
 }
 
 // Analytics

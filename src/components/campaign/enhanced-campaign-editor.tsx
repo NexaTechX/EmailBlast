@@ -9,7 +9,9 @@ import CampaignPreview from "./CampaignPreview";
 import { AIContentGenerator } from "../ai/ai-content-generator";
 import { ColdOutreachTools } from "./cold-outreach-tools";
 import { CampaignAutomation } from "./campaign-automation";
-import { Sparkles, Zap, Clock } from "lucide-react";
+import { TemplateGallery } from "./template-gallery";
+import { Sparkles, Zap, Clock, FileText } from "lucide-react";
+import type { EmailTemplate } from "@/lib/email-templates";
 
 interface EnhancedCampaignEditorProps {
   onContentChange?: (content: string) => void;
@@ -40,6 +42,7 @@ const EnhancedCampaignEditor = ({
   const [content, setContent] = useState(initialContent);
   const [details, setDetails] = useState(initialDetails);
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [templateGalleryOpen, setTemplateGalleryOpen] = useState(false);
   const { toast } = useToast();
 
   const handleContentChange = (newContent: string) => {
@@ -70,9 +73,24 @@ const EnhancedCampaignEditor = ({
     });
   };
 
+  const handleSelectTemplate = (template: EmailTemplate) => {
+    handleContentChange(template.html);
+    toast({
+      title: "Template Applied",
+      description: `"${template.name}" template has been applied to your campaign.`,
+    });
+    setTemplateGalleryOpen(false);
+  };
+
   return (
-    <Card className="w-full h-full bg-background">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+    <>
+      <TemplateGallery
+        open={templateGalleryOpen}
+        onOpenChange={setTemplateGalleryOpen}
+        onSelectTemplate={handleSelectTemplate}
+      />
+      <Card className="w-full h-full bg-background">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
         <div className="flex items-center justify-between border-b px-6 py-3">
           <TabsList>
             <TabsTrigger value="details">Campaign Details</TabsTrigger>
@@ -82,6 +100,13 @@ const EnhancedCampaignEditor = ({
             <TabsTrigger value="preview">Preview</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setTemplateGalleryOpen(true)}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Templates
+            </Button>
             <Button
               variant="outline"
               onClick={() => setAiPanelOpen(!aiPanelOpen)}
@@ -135,7 +160,8 @@ const EnhancedCampaignEditor = ({
           )}
         </div>
       </Tabs>
-    </Card>
+      </Card>
+    </>
   );
 };
 

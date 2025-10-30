@@ -19,9 +19,10 @@ interface CampaignHeaderProps {
   title?: string;
   onTitleChange?: (title: string) => void;
   onSaveDraft?: () => void;
-  onSchedule?: () => void;
+  onSchedule?: (scheduledFor: string) => void;
   onSend?: () => void;
   campaign?: any;
+  saving?: boolean;
 }
 
 const CampaignHeader = ({
@@ -31,6 +32,7 @@ const CampaignHeader = ({
   onSchedule = () => {},
   onSend = () => {},
   campaign,
+  saving = false,
 }: CampaignHeaderProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title);
@@ -69,14 +71,8 @@ const CampaignHeader = ({
   const handleScheduleSubmit = () => {
     // Combine date and time for scheduling
     const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
-    console.log("Scheduling campaign for:", scheduledDateTime);
-    onSchedule();
+    onSchedule(scheduledDateTime.toISOString());
     setShowScheduleDialog(false);
-
-    toast({
-      title: "Campaign Scheduled",
-      description: `Your campaign has been scheduled for ${scheduleDate} at ${scheduleTime}`,
-    });
   };
 
   const handleSendTest = async () => {
@@ -202,9 +198,10 @@ const CampaignHeader = ({
             variant="outline"
             onClick={onSaveDraft}
             className="flex items-center gap-2"
+            disabled={saving}
           >
             <Save className="h-4 w-4" />
-            Save Draft
+            {saving ? "Saving..." : "Save Draft"}
           </Button>
 
           <Dialog open={showTestDialog} onOpenChange={setShowTestDialog}>

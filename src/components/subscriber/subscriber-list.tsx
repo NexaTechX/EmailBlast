@@ -188,13 +188,14 @@ export function SubscriberLists() {
               </Tabs>
             </div>
 
-            {loading ? (
+              {loading ? (
               <div className="flex justify-center items-center py-8">
                 <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : filteredSubscribers.length > 0 ? (
               <>
-                <div className="border rounded-md overflow-hidden">
+                {/* Desktop table view */}
+                <div className="hidden md:block border rounded-md overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-muted/50">
                       <tr>
@@ -317,7 +318,63 @@ export function SubscriberLists() {
                   </table>
                 </div>
 
-                <div className="flex justify-between items-center mt-4">
+                {/* Mobile card view */}
+                <div className="md:hidden space-y-3">
+                  {filteredSubscribers.map((subscriber) => (
+                    <Card key={subscriber.id} className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="rounded"
+                            checked={selectedSubscribers.includes(subscriber.id)}
+                            onChange={() => toggleSelectSubscriber(subscriber.id)}
+                          />
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        {subscriber.unsubscribed_at ? (
+                          <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                            Unsubscribed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                            Active
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="font-medium text-sm">{subscriber.email}</p>
+                        {(subscriber.first_name || subscriber.last_name) && (
+                          <p className="text-sm text-muted-foreground">
+                            {subscriber.first_name} {subscriber.last_name}
+                          </p>
+                        )}
+                        {subscriber.company && (
+                          <p className="text-sm text-muted-foreground">{subscriber.company}</p>
+                        )}
+                        {subscriber.tags && subscriber.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {subscriber.tags.slice(0, 2).map((tag, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {subscriber.tags.length > 2 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{subscriber.tags.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Added: {new Date(subscriber.subscribed_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-3">
                   <div className="text-sm text-muted-foreground">
                     {selectedSubscribers.length > 0
                       ? `${selectedSubscribers.length} selected`

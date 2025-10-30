@@ -54,7 +54,8 @@ export function CampaignList() {
         </Button>
       </div>
 
-      <Card>
+      {/* Desktop table view */}
+      <Card className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -106,6 +107,60 @@ export function CampaignList() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-3">
+        {campaigns.map((campaign) => (
+          <Card
+            key={campaign.id}
+            className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => navigate(`/app/campaigns/${campaign.id}`)}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium truncate">{campaign.title}</h3>
+                <p className="text-sm text-muted-foreground truncate mt-1">
+                  {campaign.subject}
+                </p>
+              </div>
+              <Badge className={getStatusColor(campaign.status) + " ml-2 flex-shrink-0"}>
+                {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+              </Badge>
+            </div>
+            {campaign.sent_at && (
+              <p className="text-xs text-muted-foreground mb-3">
+                Sent: {new Date(campaign.sent_at).toLocaleDateString()}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/app/campaigns/${campaign.id}`);
+                }}
+              >
+                <Mail className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/app/campaigns/${campaign.id}/analytics`);
+                }}
+              >
+                <BarChart className="h-4 w-4 mr-1" />
+                Analytics
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

@@ -32,6 +32,7 @@ export interface Campaign {
   created_at: string;
   updated_at: string;
   list_id: string;
+  user_id?: string;
   is_cold_outreach?: boolean;
   automation_enabled?: boolean;
   metadata?: {
