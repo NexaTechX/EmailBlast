@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
+// Labelled form-field wrapper used by the profile form.
 function Field({
   label,
   children,
@@ -22,6 +23,7 @@ function Field({
   );
 }
 
+// Profile settings form: loads and updates the user's profile row.
 export function ProfileSettings() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -32,12 +34,7 @@ export function ProfileSettings() {
     website: "",
   });
 
-  useEffect(() => {
-    if (user?.id) {
-      loadProfile();
-    }
-  }, [user?.id]);
-
+  // Loads the user's profile row into state (no-op if the table is absent).
   const loadProfile = async () => {
     try {
       // First check if the profiles table exists
@@ -71,6 +68,13 @@ export function ProfileSettings() {
     }
   };
 
+  useEffect(() => {
+    if (user?.id) {
+      loadProfile();
+    }
+  }, [user?.id]);
+
+  // Persists the edited profile back to the database.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);

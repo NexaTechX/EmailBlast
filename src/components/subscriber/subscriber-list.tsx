@@ -32,6 +32,7 @@ const TABS = [
   { value: "unsubscribed", label: "Unsubscribed" },
 ] as const;
 
+// Audience view: lists, filters, selects, imports and deletes subscribers.
 export function SubscriberLists() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,10 +42,7 @@ export function SubscriberLists() {
   const [showImport, setShowImport] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadSubscribers();
-  }, [activeTab]);
-
+  // Loads subscribers for the active tab (all / active / unsubscribed).
   const loadSubscribers = async () => {
     setLoading(true);
     try {
@@ -71,15 +69,22 @@ export function SubscriberLists() {
     }
   };
 
+  useEffect(() => {
+    loadSubscribers();
+  }, [activeTab]);
+
+  // Toggles a subscriber in/out of the current selection.
   const toggleSelectSubscriber = (id: string) => {
     setSelectedSubscribers((prev) =>
       prev.includes(id) ? prev.filter((subId) => subId !== id) : [...prev, id],
     );
   };
 
+  // Deletes the selected subscribers after a confirmation prompt.
   const handleDeleteSelected = async () => {
     if (!selectedSubscribers.length) return;
     if (
+      // skipcq: JS-0052 — native confirm is an intentional guard for a destructive, irreversible delete.
       !confirm(
         `Delete ${selectedSubscribers.length} subscriber(s)? This can't be undone.`,
       )
@@ -123,6 +128,7 @@ export function SubscriberLists() {
     filteredSubscribers.length > 0 &&
     selectedSubscribers.length === filteredSubscribers.length;
 
+  // Renders a subscriber's display name, or an em dash when unknown.
   const fullName = (s: Subscriber) =>
     s.first_name || s.last_name
       ? `${s.first_name || ""} ${s.last_name || ""}`.trim()

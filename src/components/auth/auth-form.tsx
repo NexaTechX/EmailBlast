@@ -6,6 +6,35 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/auth";
 import { MailCheck } from "lucide-react";
 
+// Labelled input row with an optional trailing action (e.g. a "Forgot?" link).
+// Extracted so the form markup stays shallow.
+function LabeledInput({
+  id,
+  label,
+  action,
+  ...inputProps
+}: {
+  id: string;
+  label: string;
+  action?: React.ReactNode;
+} & React.ComponentProps<typeof Input>) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label
+          htmlFor={id}
+          className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
+        >
+          {label}
+        </label>
+        {action}
+      </div>
+      <Input id={id} className="h-11" {...inputProps} />
+    </div>
+  );
+}
+
+// Sign-in / sign-up form with an inline email-verification (OTP) step.
 export function AuthForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -18,9 +47,11 @@ export function AuthForm() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Returns a user-facing message from an unknown error, with a fallback.
   const errorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 
+  // Handles sign in or sign up; routes to the verification step when needed.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -48,6 +79,7 @@ export function AuthForm() {
     }
   };
 
+  // Submits the emailed OTP code to establish a session.
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingEmail) return;
@@ -68,6 +100,7 @@ export function AuthForm() {
     }
   };
 
+  // Requests a fresh verification code for the pending email.
   const handleResend = async () => {
     if (!pendingEmail) return;
     try {
@@ -104,26 +137,17 @@ export function AuthForm() {
         </div>
 
         <form onSubmit={handleVerify} className="space-y-4">
-          <div className="space-y-1.5">
-            <label
-              htmlFor="code"
-              className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
-            >
-              Verification code
-            </label>
-            <Input
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="000000"
-              value={code}
-              onChange={(e) =>
-                setCode(e.target.value.replace(/\s/g, ""))
-              }
-              required
-              className="h-12 text-center font-mono text-lg tracking-[0.5em]"
-            />
-          </div>
+          <LabeledInput
+            id="code"
+            label="Verification code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="000000"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\s/g, ""))}
+            required
+            className="h-12 text-center font-mono text-lg tracking-[0.5em]"
+          />
 
           <Button
             type="submit"
@@ -190,48 +214,32 @@ export function AuthForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <label
-            htmlFor="email"
-            className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
-          >
-            Email
-          </label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="h-11"
-          />
-        </div>
+        <LabeledInput
+          id="email"
+          label="Email"
+          type="email"
+          placeholder="you@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
 
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="password"
-              className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
-            >
-              Password
-            </label>
-            {mode === "login" && (
+        <LabeledInput
+          id="password"
+          label="Password"
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          action={
+            mode === "login" ? (
               <span className="cursor-pointer text-xs text-muted-foreground transition-colors hover:text-foreground">
                 Forgot?
               </span>
-            )}
-          </div>
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="h-11"
-          />
-        </div>
+            ) : null
+          }
+        />
 
         <Button type="submit" className="h-11 w-full" disabled={loading}>
           {loading

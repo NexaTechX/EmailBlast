@@ -15,6 +15,7 @@ interface AnalyticsSummary {
   conversions: number;
 }
 
+// Maps an analytics event type to its status-dot colour class.
 const eventDot = (type: CampaignAnalytics["event_type"]) => {
   switch (type) {
     case "open":
@@ -32,6 +33,7 @@ const eventDot = (type: CampaignAnalytics["event_type"]) => {
   }
 };
 
+// Campaign analytics view: loads events and renders summary tiles + a stream.
 export function AdvancedAnalyticsDashboard({
   campaignId,
 }: {
@@ -50,12 +52,49 @@ export function AdvancedAnalyticsDashboard({
   });
   const [timeframe, setTimeframe] = useState<"day" | "week" | "month">("week");
 
-  useEffect(() => {
-    if (campaignId && campaignId !== "undefined") {
-      loadAnalytics();
-    }
-  }, [campaignId, timeframe]);
+  // Tallies event counts and revenue into the summary state.
+  const calculateSummary = (data: CampaignAnalytics[]) => {
+    const next = data.reduce(
+      (acc, event) => {
+        acc.totalEvents++;
+        switch (event.event_type) {
+          case "open":
+            acc.opens++;
+            break;
+          case "click":
+            acc.clicks++;
+            break;
+          case "unsubscribe":
+            acc.unsubscribes++;
+            break;
+          case "bounce":
+            acc.bounces++;
+            break;
+          case "conversion":
+            acc.conversions++;
+            if (event.metadata?.revenue) {
+              acc.revenue += Number(event.metadata.revenue);
+            }
+            break;
+          default:
+            break;
+        }
+        return acc;
+      },
+      {
+        opens: 0,
+        clicks: 0,
+        unsubscribes: 0,
+        bounces: 0,
+        totalEvents: 0,
+        revenue: 0,
+        conversions: 0,
+      },
+    );
+    setSummary(next);
+  };
 
+  // Fetches analytics for the campaign and recomputes the summary.
   const loadAnalytics = async () => {
     try {
       const { error: tableCheckError } = await supabase
@@ -82,45 +121,13 @@ export function AdvancedAnalyticsDashboard({
     }
   };
 
-  const calculateSummary = (data: CampaignAnalytics[]) => {
-    const next = data.reduce(
-      (acc, event) => {
-        acc.totalEvents++;
-        switch (event.event_type) {
-          case "open":
-            acc.opens++;
-            break;
-          case "click":
-            acc.clicks++;
-            break;
-          case "unsubscribe":
-            acc.unsubscribes++;
-            break;
-          case "bounce":
-            acc.bounces++;
-            break;
-          case "conversion":
-            acc.conversions++;
-            if (event.metadata?.revenue) {
-              acc.revenue += Number(event.metadata.revenue);
-            }
-            break;
-        }
-        return acc;
-      },
-      {
-        opens: 0,
-        clicks: 0,
-        unsubscribes: 0,
-        bounces: 0,
-        totalEvents: 0,
-        revenue: 0,
-        conversions: 0,
-      },
-    );
-    setSummary(next);
-  };
+  useEffect(() => {
+    if (campaignId && campaignId !== "undefined") {
+      loadAnalytics();
+    }
+  }, [campaignId, timeframe]);
 
+  // Percentage of total events represented by `n`, as a fixed string.
   const rate = (n: number) =>
     summary.totalEvents > 0
       ? ((n / summary.totalEvents) * 100).toFixed(1)

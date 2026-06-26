@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { getCampaigns } from "@/lib/api";
 import type { Campaign } from "@/types";
 
+// Maps a campaign status to its status-dot colour class.
 const statusDot = (status: Campaign["status"]) => {
   switch (status) {
     case "sent":
@@ -20,15 +21,13 @@ const statusDot = (status: Campaign["status"]) => {
   }
 };
 
+// Lists the signed-in user's campaigns with status and quick actions.
 export function CampaignList() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadCampaigns();
-  }, []);
-
+  // Fetches the campaign list into state.
   const loadCampaigns = async () => {
     setLoading(true);
     try {
@@ -39,6 +38,10 @@ export function CampaignList() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadCampaigns();
+  }, []);
 
   return (
     <div className="space-y-8">

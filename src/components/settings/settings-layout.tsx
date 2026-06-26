@@ -16,6 +16,7 @@ const settingsNav = [
   { title: "Team", href: "/app/settings/team", icon: Users },
 ];
 
+// Settings shell: side navigation plus the active sub-page outlet.
 export function SettingsLayout() {
   const location = useLocation();
 

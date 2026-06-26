@@ -23,6 +23,7 @@ type AuthContextType = {
   sendVerificationEmail: (email: string) => Promise<void>;
 };
 
+// skipcq: JS-W1042 — React's createContext<T> requires a default arg; `undefined` is the intended sentinel.
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Idempotent: make sure the signed-in user has a profiles row. Runs on every
@@ -44,6 +45,7 @@ async function ensureProfile() {
   }
 }
 
+// Provides auth state and actions (sign in/up/out, OTP verification) to the tree.
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Registers a new account; reports whether email verification is still pending.
   const signUp = async (
     email: string,
     password: string,
@@ -108,11 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { needsVerification: !data?.session };
   };
 
+  // Signs the user in with email and password.
   const signIn = async (email: string, password: string) => {
     const { error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
+  // Ends the current session.
   const signOut = async () => {
     const { error } = await client.auth.signOut();
     if (error) throw error;
@@ -158,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Hook to read the auth context; throws if used outside an AuthProvider.
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
