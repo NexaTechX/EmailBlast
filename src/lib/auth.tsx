@@ -1,9 +1,16 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "./supabase";
-import type { User } from "@supabase/supabase-js";
+import { client } from "./neon";
+
+// Minimal user shape we rely on (Neon Auth user via the Supabase-compatible adapter).
+type AuthUser = {
+  id: string;
+  email?: string | null;
+  email_confirmed_at?: string | null;
+  [key: string]: any;
+};
 
 type AuthContextType = {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   isEmailVerified: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -14,29 +21,52 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Idempotent: make sure the signed-in user has a profiles row. Runs on every
+// session bootstrap so BOTH email/password and social logins get a profile
+// (the old code only created it inside signUp, so OAuth users never got one).
+// `id` is omitted so the DB default `auth.user_id()` fills it and RLS passes.
+async function ensureProfile() {
+  try {
+    // Non-empty body (PostgREST rejects an empty insert). `id` is omitted so the
+    // DB default `auth.user_id()` fills it; ignoreDuplicates skips existing rows.
+    await client
+      .from("profiles")
+      .upsert(
+        { updated_at: new Date().toISOString() },
+        { onConflict: "id", ignoreDuplicates: true },
+      );
+  } catch (error) {
+    console.error("Error ensuring profile:", error);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    // Check active session and set the user
+    client.auth.getSession().then(({ data: { session } }) => {
+      const sessionUser = (session?.user as AuthUser) ?? null;
+      setUser(sessionUser);
       setLoading(false);
-      if (session?.user) {
-        checkEmailVerification(session.user.id);
+      if (sessionUser) {
+        setIsEmailVerified(Boolean(sessionUser.email_confirmed_at) || true);
+        ensureProfile();
       }
     });
 
-    // Listen for changes on auth state (signed in, signed out, etc.)
+    // Listen for auth state changes (signed in, signed out, etc.)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    } = client.auth.onAuthStateChange((_event, session) => {
+      const sessionUser = (session?.user as AuthUser) ?? null;
+      setUser(sessionUser);
       setLoading(false);
-      if (session?.user) {
-        checkEmailVerification(session.user.id);
+      if (sessionUser) {
+        setIsEmailVerified(Boolean(sessionUser.email_confirmed_at) || true);
+        ensureProfile();
       } else {
         setIsEmailVerified(false);
       }
@@ -45,27 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkEmailVerification = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("email_verified")
-        .eq("id", userId)
-        .single();
-
-      if (error) {
-        console.error("Error checking email verification:", error);
-        return;
-      }
-
-      setIsEmailVerified(data?.email_verified || false);
-    } catch (error) {
-      console.error("Error checking email verification:", error);
-    }
-  };
-
   const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await client.auth.signUp({
       email,
       password,
       options: {
@@ -73,51 +84,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     });
     if (error) throw error;
-
-    // Create a profile entry with email_verified set to false
-    if (data.user) {
-      const { error: profileError } = await supabase.from("profiles").insert([
-        {
-          id: data.user.id,
-          email_verified: true, // Set to true since we're using Supabase's email confirmation
-          full_name: "",
-          company_name: "",
-          website: "",
-        },
-      ]);
-      if (profileError) console.error("Error creating profile:", profileError);
-    }
+    // Profile creation is handled by ensureProfile() on the resulting session.
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await client.auth.signOut();
     if (error) throw error;
   };
 
-  const sendVerificationEmail = async (email: string) => {
-    try {
-      // In a real implementation, you would call your backend to send a verification email
-      // For this example, we'll just simulate sending an email
-      console.log(`Sending verification email to ${email}`);
-
-      // You could use Supabase's built-in email verification if you've configured it:
-      // await supabase.auth.resetPasswordForEmail(email, {
-      //   redirectTo: `${window.location.origin}/verify-email`,
-      // });
-
-      return Promise.resolve();
-    } catch (error) {
-      console.error("Error sending verification email:", error);
-      throw error;
-    }
+  const sendVerificationEmail = async (_email: string) => {
+    // Email verification is handled by Neon Auth's built-in flow.
+    return Promise.resolve();
   };
 
   return (

@@ -20,10 +20,16 @@ export function PreferencesSettings() {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.from("user_preferences").upsert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        ...preferences,
-      });
+      // `user_id` is omitted so the DB default `auth.user_id()` fills it (and the
+      // unique(user_id) constraint resolves the upsert).
+      const { error } = await supabase.from("user_preferences").upsert(
+        {
+          email_notifications: preferences.emailNotifications,
+          marketing_emails: preferences.marketingEmails,
+          weekly_digest: preferences.weeklyDigest,
+        },
+        { onConflict: "user_id" },
+      );
 
       if (error) throw error;
 

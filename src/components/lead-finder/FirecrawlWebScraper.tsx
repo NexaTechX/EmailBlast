@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
+import { firecrawlFetch } from "@/lib/firecrawl-client";
 import { Lead } from "./lead-database";
 import {
   Search,
@@ -65,25 +66,15 @@ export function FirecrawlWebScraper({ onLeadsFound = (leads: Lead[]) => {} }) {
         description: "Extracting contact information from the provided URL...",
       });
 
-      // Use FireCrawl JS library to scrape the URL
-      const firecrawlApp = {
-        apiKey: "fc-01e68c0f41394d9491ec4d0e2fdfef75",
-      };
-
       setProgress(30);
 
-      // Make the API request directly
+      // Scrape via our server proxy (key stays server-side)
       const requestBody = {
         url: formattedUrl,
         formats: ["markdown", "html", "links", "text"],
       };
 
-      const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${firecrawlApp.apiKey}`,
-        },
+      const response = await firecrawlFetch("scrape", {
         body: JSON.stringify(requestBody),
       });
 
@@ -231,12 +222,7 @@ export function FirecrawlWebScraper({ onLeadsFound = (leads: Lead[]) => {} }) {
             ignoreSitemap: false,
           };
 
-          const mapResponse = await fetch("https://api.firecrawl.dev/v1/map", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${firecrawlApp.apiKey}`,
-            },
+          const mapResponse = await firecrawlFetch("map", {
             body: JSON.stringify(mapRequestBody),
           });
 
@@ -270,17 +256,9 @@ export function FirecrawlWebScraper({ onLeadsFound = (leads: Lead[]) => {} }) {
               formats: ["html", "text", "links"],
             };
 
-            const contactResponse = await fetch(
-              "https://api.firecrawl.dev/v1/scrape",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${firecrawlApp.apiKey}`,
-                },
-                body: JSON.stringify(contactRequestBody),
-              },
-            );
+            const contactResponse = await firecrawlFetch("scrape", {
+              body: JSON.stringify(contactRequestBody),
+            });
 
             if (!contactResponse.ok) {
               throw new Error(`Contact API error: ${contactResponse.status}`);

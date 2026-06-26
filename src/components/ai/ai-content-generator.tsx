@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sparkles, RefreshCw, Copy, Check, Lightbulb } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { generateContentWithGemini } from "@/lib/gemini-api";
 
 interface AIContentGeneratorProps {
   onSelectContent?: (content: string) => void;
@@ -60,64 +61,8 @@ export function AIContentGenerator({
 
     setLoading(true);
     try {
-      // Use Gemini API to generate content
-      const apiKey = "AIzaSyAj0x2tyqFkOG7lDCHk3ShzQAxpfat4Pcc";
-      const apiUrl =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
-
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: `Generate HTML content for an email marketing campaign based on this prompt: "${prompt}". 
-                The content should be well-formatted with proper HTML tags including h1, h2, p, ul, li, etc. 
-                Make it professional, engaging, and optimized for email marketing. 
-                Include appropriate sections like greeting, body, call-to-action, and signature.
-                Return ONLY the HTML content without any explanations or markdown formatting.`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
-        },
-      };
-
-      const response = await fetch(`${apiUrl}?key=${apiKey}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Gemini API error: ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
-      const generatedText = data.candidates[0]?.content.parts[0].text;
-
-      if (!generatedText) {
-        throw new Error("No text generated from Gemini API");
-      }
-
-      // Extract HTML content from the response
-      let generatedContent = generatedText;
-
-      // Clean up the response if needed
-      if (generatedContent.includes("```html")) {
-        generatedContent = generatedContent
-          .split("```html")[1]
-          .split("```")[0]
-          .trim();
-      }
+      // Generate content via our server-side AI (Groq) — no key in the browser
+      const generatedContent = await generateContentWithGemini(prompt);
 
       // Generate a few variations with slight modifications
       const variations = [

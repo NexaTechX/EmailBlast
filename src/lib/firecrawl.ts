@@ -1,9 +1,8 @@
-// Firecrawl API integration for web scraping and lead generation
-
-const FIRECRAWL_API_KEY = "fc-01e68c0f41394d9491ec4d0e2fdfef75";
-const FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1";
+// Firecrawl web scraping. Calls go through our server proxy (/api/scrape);
+// the Firecrawl key lives server-side, not in the browser.
 
 import { Lead } from "./gemini-api";
+import { firecrawlFetch } from "./firecrawl-client";
 
 interface FirecrawlRequestBody {
   url: string;
@@ -68,12 +67,7 @@ export async function scrapeWebsiteForLeads(
       },
     };
 
-    const response = await fetch(`${FIRECRAWL_API_URL}/scrape`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-      },
+    const response = await firecrawlFetch("scrape", {
       body: JSON.stringify(requestBody),
     });
 
@@ -201,17 +195,9 @@ export async function searchAndScrapeLeads(
     const { maxResults = 10, location, industry } = options;
 
     // First, search for relevant websites based on the query
-    const searchUrl = new URL(`${FIRECRAWL_API_URL}/search`);
-    searchUrl.searchParams.append("q", query);
-    if (location) searchUrl.searchParams.append("location", location);
-    if (industry) searchUrl.searchParams.append("industry", industry);
-    searchUrl.searchParams.append("limit", maxResults.toString());
-
-    const searchResponse = await fetch(searchUrl.toString(), {
+    const searchResponse = await firecrawlFetch("search", {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-      },
+      query: { q: query, location, industry, limit: maxResults },
     });
 
     if (!searchResponse.ok) {

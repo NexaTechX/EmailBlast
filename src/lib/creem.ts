@@ -1,31 +1,16 @@
-import axios from "axios";
+// Payments are deferred during the Neon migration. The previous Creem flow called
+// the Creem API directly from the browser using VITE_CREEM_API_KEY, which exposed
+// a secret in the client bundle. Re-enable by adding a Vercel /api function that
+// creates the Creem checkout server-side.
 
 interface CreateCheckoutParams {
   productId: string;
 }
 
-export async function createCheckoutSession({
-  productId,
-}: CreateCheckoutParams) {
-  try {
-    const response = await axios.post(
-      "https://api.creem.io/v1/checkouts",
-      {
-        product_id: productId,
-      },
-      {
-        headers: {
-          "x-api-key": import.meta.env.VITE_CREEM_API_KEY,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    // Redirect to the checkout URL
-    window.location.href = response.data.checkout_url;
-    return response.data;
-  } catch (error) {
-    console.error("Error creating checkout:", error);
-    throw error;
-  }
+export async function createCheckoutSession(
+  _params: CreateCheckoutParams,
+): Promise<void> {
+  throw new Error(
+    "Payments are temporarily disabled while we finish migrating the backend.",
+  );
 }
