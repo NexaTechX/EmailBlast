@@ -12,9 +12,14 @@ export function AuthForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const { signIn, signUp } = useAuth();
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const { signIn, signUp, verifyEmailOtp, resendVerification } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const errorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,58 +37,123 @@ export function AuthForm() {
         }
       }
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "An error occurred during authentication";
       console.error("Authentication error:", error);
       toast({
         variant: "destructive",
         title: "Authentication failed",
-        description: message,
+        description: errorMessage(error, "An error occurred during authentication"),
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // Verification-pending screen — the account was created but Neon Auth requires
-  // the user to confirm their email before a session is issued.
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingEmail) return;
+    setVerifying(true);
+    try {
+      await verifyEmailOtp(pendingEmail, code.trim());
+      toast({ title: "Email verified", description: "Welcome to EmailBlast." });
+      navigate("/app");
+    } catch (error) {
+      console.error("Verification error:", error);
+      toast({
+        variant: "destructive",
+        title: "Verification failed",
+        description: errorMessage(error, "That code is invalid or expired."),
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!pendingEmail) return;
+    try {
+      await resendVerification(pendingEmail);
+      toast({
+        title: "Code resent",
+        description: `We sent a new code to ${pendingEmail}.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't resend",
+        description: errorMessage(error, "Please try again in a moment."),
+      });
+    }
+  };
+
+  // Verification screen — the account was created but Neon Auth requires the
+  // email code before a session is issued.
   if (pendingEmail) {
     return (
-      <div className="space-y-6 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border bg-card">
-          <MailCheck className="h-6 w-6" strokeWidth={1.75} />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Check your inbox
+      <div className="space-y-7">
+        <div className="text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border bg-card">
+            <MailCheck className="h-6 w-6" strokeWidth={1.75} />
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight">
+            Verify your email
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            We sent a verification link to{" "}
+            Enter the code we sent to{" "}
             <span className="font-medium text-foreground">{pendingEmail}</span>.
-            Confirm it to activate your account, then sign in.
           </p>
         </div>
-        <div className="rounded-lg border bg-muted/40 px-4 py-3 text-left">
-          <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            Next step
-          </p>
-          <p className="mt-1 text-sm">
-            Open the email and follow the link. Don&apos;t see it? Check your
-            spam folder.
-          </p>
+
+        <form onSubmit={handleVerify} className="space-y-4">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="code"
+              className="font-mono text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              Verification code
+            </label>
+            <Input
+              id="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              value={code}
+              onChange={(e) =>
+                setCode(e.target.value.replace(/\s/g, ""))
+              }
+              required
+              className="h-12 text-center font-mono text-lg tracking-[0.5em]"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="h-11 w-full"
+            disabled={verifying || code.trim().length < 4}
+          >
+            {verifying ? "Verifying…" : "Verify & continue"}
+          </Button>
+        </form>
+
+        <div className="flex items-center justify-between text-sm">
+          <button
+            type="button"
+            onClick={handleResend}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Resend code
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPendingEmail(null);
+              setCode("");
+              setMode("login");
+            }}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Back to sign in
+          </button>
         </div>
-        <Button
-          variant="outline"
-          className="h-11 w-full"
-          onClick={() => {
-            setPendingEmail(null);
-            setMode("login");
-          }}
-        >
-          Back to sign in
-        </Button>
       </div>
     );
   }

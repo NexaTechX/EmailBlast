@@ -1,27 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  Mail,
-  MousePointerClick,
-  UserMinus,
-  AlertTriangle,
-  Calendar,
-  Users,
-  TrendingUp,
-  DollarSign,
-  Clock,
-} from "lucide-react";
+import { Activity } from "lucide-react";
 import { getCampaignAnalytics } from "@/components/analytics/analytics-utils";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -36,6 +14,23 @@ interface AnalyticsSummary {
   revenue: number;
   conversions: number;
 }
+
+const eventDot = (type: CampaignAnalytics["event_type"]) => {
+  switch (type) {
+    case "open":
+      return "bg-sky-500";
+    case "click":
+      return "bg-emerald-500";
+    case "conversion":
+      return "bg-violet-500";
+    case "unsubscribe":
+      return "bg-amber-500";
+    case "bounce":
+      return "bg-red-500";
+    default:
+      return "bg-muted-foreground/40";
+  }
+};
 
 export function AdvancedAnalyticsDashboard({
   campaignId,
@@ -63,23 +58,17 @@ export function AdvancedAnalyticsDashboard({
 
   const loadAnalytics = async () => {
     try {
-      // First check if the campaign_analytics table exists
       const { error: tableCheckError } = await supabase
         .from("campaign_analytics")
         .select("count")
         .limit(1);
 
-      // If the table doesn't exist, use empty data
       if (tableCheckError && tableCheckError.code === "42P01") {
-        console.log(
-          "Campaign analytics table does not exist yet, using empty data",
-        );
         setAnalytics([]);
         calculateSummary([]);
         return;
       }
 
-      // If the table exists, get the analytics data
       const data = await getCampaignAnalytics(campaignId);
       setAnalytics(data);
       calculateSummary(data);
@@ -94,7 +83,7 @@ export function AdvancedAnalyticsDashboard({
   };
 
   const calculateSummary = (data: CampaignAnalytics[]) => {
-    const summary = data.reduce(
+    const next = data.reduce(
       (acc, event) => {
         acc.totalEvents++;
         switch (event.event_type) {
@@ -129,242 +118,114 @@ export function AdvancedAnalyticsDashboard({
         conversions: 0,
       },
     );
-    setSummary(summary);
+    setSummary(next);
   };
 
-  const getEventIcon = (type: CampaignAnalytics["event_type"]) => {
-    switch (type) {
-      case "open":
-        return <Mail className="h-4 w-4" />;
-      case "click":
-        return <MousePointerClick className="h-4 w-4" />;
-      case "unsubscribe":
-        return <UserMinus className="h-4 w-4" />;
-      case "bounce":
-        return <AlertTriangle className="h-4 w-4" />;
-      case "conversion":
-        return <DollarSign className="h-4 w-4" />;
-      default:
-        return <Mail className="h-4 w-4" />;
-    }
-  };
+  const rate = (n: number) =>
+    summary.totalEvents > 0
+      ? ((n / summary.totalEvents) * 100).toFixed(1)
+      : "0";
+
+  const tiles = [
+    { label: "Opens", value: String(summary.opens), sub: `${rate(summary.opens)}% of events` },
+    { label: "Clicks", value: String(summary.clicks), sub: `${rate(summary.clicks)}% of events` },
+    {
+      label: "Revenue",
+      value: `$${summary.revenue.toFixed(2)}`,
+      sub: `${summary.conversions} conversions`,
+    },
+    {
+      label: "Unsubscribes",
+      value: String(summary.unsubscribes),
+      sub: `${summary.bounces} bounced`,
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">
-          Campaign Analytics
-        </h2>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setTimeframe("day")}
-            className={timeframe === "day" ? "bg-primary/10" : ""}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Day
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setTimeframe("week")}
-            className={timeframe === "week" ? "bg-primary/10" : ""}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Week
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setTimeframe("month")}
-            className={timeframe === "month" ? "bg-primary/10" : ""}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Month
-          </Button>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            Analytics
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+            {campaignId === "overview" ? "Overview" : "Campaign performance"}
+          </h2>
+        </div>
+        <div className="inline-flex rounded-lg border p-1">
+          {(["day", "week", "month"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTimeframe(t)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                timeframe === t
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-6">
-          <div className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-blue-500" />
-            <h3 className="font-semibold">Opens</h3>
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 divide-x divide-y border lg:grid-cols-4 lg:divide-y-0">
+        {tiles.map((t) => (
+          <div key={t.label} className="p-6">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              {t.label}
+            </p>
+            <p className="mt-2 font-mono text-3xl font-semibold tabular-nums tracking-tight">
+              {t.value}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{t.sub}</p>
           </div>
-          <p className="mt-2 text-3xl font-bold">{summary.opens}</p>
-          <p className="text-sm text-muted-foreground">
-            {summary.totalEvents > 0
-              ? ((summary.opens / summary.totalEvents) * 100).toFixed(1)
-              : 0}
-            % of total
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-2">
-            <MousePointerClick className="h-5 w-5 text-green-500" />
-            <h3 className="font-semibold">Clicks</h3>
-          </div>
-          <p className="mt-2 text-3xl font-bold">{summary.clicks}</p>
-          <p className="text-sm text-muted-foreground">
-            {summary.totalEvents > 0
-              ? ((summary.clicks / summary.totalEvents) * 100).toFixed(1)
-              : 0}
-            % of total
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-500" />
-            <h3 className="font-semibold">Revenue</h3>
-          </div>
-          <p className="mt-2 text-3xl font-bold">
-            ${summary.revenue.toFixed(2)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {summary.conversions} conversions
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-blue-500" />
-            <h3 className="font-semibold">ROI</h3>
-          </div>
-          <p className="mt-2 text-3xl font-bold">
-            {summary.revenue > 0
-              ? ((summary.revenue / 100) * 100).toFixed(0)
-              : 0}
-            %
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Based on campaign cost
-          </p>
-        </Card>
+        ))}
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="engagement">Engagement</TabsTrigger>
-          <TabsTrigger value="conversions">Conversions</TabsTrigger>
-          <TabsTrigger value="audience">Audience</TabsTrigger>
-        </TabsList>
+      {/* Event stream */}
+      <div className="border">
+        <div className="flex items-center justify-between border-b px-5 py-3.5">
+          <h3 className="text-sm font-semibold">Recent events</h3>
+          <span className="font-mono text-xs text-muted-foreground">
+            {summary.totalEvents} total
+          </span>
+        </div>
 
-        <TabsContent value="overview" className="space-y-4 mt-4">
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Event Type</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Subscriber</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analytics.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getEventIcon(event.event_type)}
-                        <span className="capitalize">{event.event_type}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(event.occurred_at).toLocaleString()}
-                    </TableCell>
-                    <TableCell>{event.subscriber_id || "-"}</TableCell>
-                    <TableCell>
-                      {event.metadata ? JSON.stringify(event.metadata) : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="engagement" className="space-y-4 mt-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Engagement Metrics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Click Distribution</h4>
-                <div className="h-64 bg-muted/30 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">
-                    Click distribution chart will appear here
-                  </p>
-                </div>
+        {analytics.length === 0 ? (
+          <div className="px-5 py-16 text-center">
+            <Activity className="mx-auto h-8 w-8 text-muted-foreground/40" />
+            <p className="mt-3 text-sm font-medium">No events yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Opens, clicks, and conversions will appear here once you send.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {analytics.map((event) => (
+              <div
+                key={event.id}
+                className="flex items-center gap-4 px-5 py-3.5"
+              >
+                <span className="inline-flex w-32 items-center gap-2">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${eventDot(event.event_type)}`}
+                  />
+                  <span className="text-sm capitalize">{event.event_type}</span>
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                  {event.email || event.subscriber_id || "—"}
+                </span>
+                <span className="hidden font-mono text-xs text-muted-foreground sm:block">
+                  {new Date(event.occurred_at).toLocaleString()}
+                </span>
               </div>
-              <div>
-                <h4 className="text-sm font-medium mb-2">Engagement by Time</h4>
-                <div className="h-64 bg-muted/30 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">
-                    Engagement time chart will appear here
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="conversions" className="space-y-4 mt-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Conversion Tracking</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Conversion Funnel</h4>
-                <div className="h-64 bg-muted/30 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">
-                    Conversion funnel chart will appear here
-                  </p>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium mb-2">
-                  Revenue by Subscriber Segment
-                </h4>
-                <div className="h-64 bg-muted/30 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">
-                    Revenue chart will appear here
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="audience" className="space-y-4 mt-4">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Audience Insights</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-sm font-medium mb-2">
-                  Engagement by Segment
-                </h4>
-                <div className="h-64 bg-muted/30 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">
-                    Segment engagement chart will appear here
-                  </p>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium mb-2">
-                  Device & Email Client
-                </h4>
-                <div className="h-64 bg-muted/30 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">
-                    Device distribution chart will appear here
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

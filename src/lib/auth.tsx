@@ -18,6 +18,8 @@ type AuthContextType = {
     password: string,
   ) => Promise<{ needsVerification: boolean }>;
   signOut: () => Promise<void>;
+  verifyEmailOtp: (email: string, token: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
   sendVerificationEmail: (email: string) => Promise<void>;
 };
 
@@ -116,6 +118,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
+  // Verify the email OTP code the user received, which establishes a session.
+  const verifyEmailOtp = async (email: string, token: string) => {
+    const { error } = await client.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
+    if (error) throw error;
+  };
+
+  // Re-send the verification email / code.
+  const resendVerification = async (email: string) => {
+    const { error } = await client.auth.resend({ email, type: "signup" });
+    if (error) throw error;
+  };
+
   const sendVerificationEmail = (_email: string): Promise<void> => {
     // Email verification is handled by Neon Auth's built-in flow.
     return Promise.resolve();
@@ -130,6 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        verifyEmailOtp,
+        resendVerification,
         sendVerificationEmail,
       }}
     >

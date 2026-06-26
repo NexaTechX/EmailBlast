@@ -1,11 +1,26 @@
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 export function ProfileSettings() {
   const { user } = useAuth();
@@ -103,54 +118,63 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold tracking-tight">Profile Settings</h2>
+      <div>
+        <h3 className="text-lg font-semibold tracking-tight">Profile</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Update your personal and company details.
+        </p>
+      </div>
 
-      <Card className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={user?.email} disabled />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
+      <form onSubmit={handleSubmit} className="border">
+        <div className="space-y-5 p-6">
+          <Field label="Email">
             <Input
-              id="fullName"
+              type="email"
+              value={user?.email ?? ""}
+              disabled
+              className="h-11"
+            />
+          </Field>
+
+          <Field label="Full name">
+            <Input
               value={profile.full_name}
               onChange={(e) =>
                 setProfile({ ...profile, full_name: e.target.value })
               }
+              className="h-11"
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="companyName">Company Name</Label>
+          <Field label="Company">
             <Input
-              id="companyName"
               value={profile.company_name}
               onChange={(e) =>
                 setProfile({ ...profile, company_name: e.target.value })
               }
+              className="h-11"
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
+          <Field label="Website">
             <Input
-              id="website"
               type="url"
+              placeholder="https://"
               value={profile.website}
               onChange={(e) =>
                 setProfile({ ...profile, website: e.target.value })
               }
+              className="h-11"
             />
-          </div>
+          </Field>
+        </div>
 
+        <div className="flex justify-end border-t px-6 py-4">
           <Button type="submit" disabled={loading}>
-            {loading ? "Saving..." : "Save Changes"}
+            {loading ? "Saving…" : "Save changes"}
           </Button>
-        </form>
-      </Card>
+        </div>
+      </form>
     </div>
   );
 }

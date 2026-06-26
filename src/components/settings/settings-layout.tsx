@@ -1,63 +1,61 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
-import { User, CreditCard, Settings, Shield, Users } from "lucide-react";
+import {
+  User,
+  CreditCard,
+  SlidersHorizontal,
+  Shield,
+  Users,
+} from "lucide-react";
 
 const settingsNav = [
-  {
-    title: "Profile",
-    href: "/app/settings",
-    icon: User,
-  },
-  {
-    title: "Subscription",
-    href: "/app/settings/subscription",
-    icon: CreditCard,
-  },
-  {
-    title: "Preferences",
-    href: "/app/settings/preferences",
-    icon: Settings,
-  },
-  {
-    title: "Security",
-    href: "/app/settings/security",
-    icon: Shield,
-  },
-  {
-    title: "Team",
-    href: "/app/settings/team",
-    icon: Users,
-  },
+  { title: "Profile", href: "/app/settings", icon: User },
+  { title: "Subscription", href: "/app/settings/subscription", icon: CreditCard },
+  { title: "Preferences", href: "/app/settings/preferences", icon: SlidersHorizontal },
+  { title: "Security", href: "/app/settings/security", icon: Shield },
+  { title: "Team", href: "/app/settings/team", icon: Users },
 ];
 
 export function SettingsLayout() {
   const location = useLocation();
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
-        <aside className="-mx-4 lg:w-1/5">
-          <nav className="flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-1">
-            {settingsNav.map((item) => (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={cn(
-                  buttonVariants({ variant: "ghost" }),
-                  location.pathname === item.href
-                    ? "bg-muted hover:bg-muted"
-                    : "hover:bg-transparent hover:underline",
-                  "justify-start",
-                )}
-              >
-                <item.icon className="mr-2 h-4 w-4" />
-                {item.title}
-              </Link>
-            ))}
+    <div className="space-y-8">
+      <div>
+        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+          Account
+        </p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight">Settings</h2>
+      </div>
+
+      <div className="flex flex-col gap-8 lg:flex-row lg:gap-12">
+        <aside className="lg:w-56 lg:shrink-0">
+          <nav className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
+            {settingsNav.map((item) => {
+              const active = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={cn(
+                    "flex items-center gap-3 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors",
+                    active
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                  )}
+                >
+                  <item.icon
+                    className="h-[18px] w-[18px] shrink-0"
+                    strokeWidth={active ? 2 : 1.75}
+                  />
+                  {item.title}
+                </Link>
+              );
+            })}
           </nav>
         </aside>
-        <div className="flex-1">
+
+        <div className="min-w-0 flex-1">
           <Outlet />
         </div>
       </div>

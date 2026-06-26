@@ -1,22 +1,28 @@
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Mail, BarChart } from "lucide-react";
+import { Plus, Pencil, BarChart3, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getCampaigns } from "@/lib/api";
 import type { Campaign } from "@/types";
 
+const statusDot = (status: Campaign["status"]) => {
+  switch (status) {
+    case "sent":
+      return "bg-emerald-500";
+    case "sending":
+      return "bg-amber-500";
+    case "scheduled":
+      return "bg-sky-500";
+    case "failed":
+      return "bg-red-500";
+    default:
+      return "bg-muted-foreground/40";
+  }
+};
+
 export function CampaignList() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,142 +30,123 @@ export function CampaignList() {
   }, []);
 
   const loadCampaigns = async () => {
+    setLoading(true);
     try {
-      const data = await getCampaigns();
-      setCampaigns(data);
+      setCampaigns(await getCampaigns());
     } catch (error) {
       console.error("Error loading campaigns:", error);
-    }
-  };
-
-  const getStatusColor = (status: Campaign["status"]) => {
-    switch (status) {
-      case "draft":
-        return "bg-gray-100 text-gray-800";
-      case "scheduled":
-        return "bg-blue-100 text-blue-800";
-      case "sent":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight">Campaigns</h2>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            Campaigns
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+            All campaigns
+          </h2>
+        </div>
         <Button onClick={() => navigate("/app/campaigns/new")}>
-          <Plus className="mr-2 h-4 w-4" /> New Campaign
+          <Plus className="mr-1.5 h-4 w-4" />
+          New campaign
         </Button>
       </div>
 
-      {/* Desktop table view */}
-      <Card className="hidden md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Campaign Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Recipients</TableHead>
-              <TableHead>Sent Date</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {campaigns.map((campaign) => (
-              <TableRow key={campaign.id}>
-                <TableCell className="font-medium">{campaign.title}</TableCell>
-                <TableCell>
-                  <Badge className={getStatusColor(campaign.status)}>
-                    {campaign.status.charAt(0).toUpperCase() +
-                      campaign.status.slice(1)}
-                  </Badge>
-                </TableCell>
-                <TableCell>-</TableCell>
-                <TableCell>
-                  {campaign.sent_at
-                    ? new Date(campaign.sent_at).toLocaleDateString()
-                    : "-"}
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate(`/app/campaigns/${campaign.id}`)}
-                    >
-                      <Mail className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        navigate(`/app/campaigns/${campaign.id}/analytics`)
-                      }
-                    >
-                      <BarChart className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
+      {/* List */}
+      <div className="border">
+        <div className="hidden items-center gap-4 border-b px-5 py-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground sm:flex">
+          <span className="flex-1">Campaign</span>
+          <span className="w-32">Status</span>
+          <span className="w-24">Sent</span>
+          <span className="w-[72px] text-right">Actions</span>
+        </div>
 
-      {/* Mobile card view */}
-      <div className="md:hidden space-y-3">
-        {campaigns.map((campaign) => (
-          <Card
-            key={campaign.id}
-            className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => navigate(`/app/campaigns/${campaign.id}`)}
-          >
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium truncate">{campaign.title}</h3>
-                <p className="text-sm text-muted-foreground truncate mt-1">
-                  {campaign.subject}
-                </p>
+        {loading ? (
+          <div className="divide-y">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="px-5 py-4">
+                <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
               </div>
-              <Badge className={getStatusColor(campaign.status) + " ml-2 flex-shrink-0"}>
-                {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
-              </Badge>
-            </div>
-            {campaign.sent_at && (
-              <p className="text-xs text-muted-foreground mb-3">
-                Sent: {new Date(campaign.sent_at).toLocaleDateString()}
-              </p>
-            )}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/app/campaigns/${campaign.id}`);
-                }}
+            ))}
+          </div>
+        ) : campaigns.length === 0 ? (
+          <div className="px-5 py-16 text-center">
+            <Send className="mx-auto h-8 w-8 text-muted-foreground/40" />
+            <p className="mt-3 text-sm font-medium">No campaigns yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Create your first campaign to get started.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-5"
+              onClick={() => navigate("/app/campaigns/new")}
+            >
+              Create campaign
+            </Button>
+          </div>
+        ) : (
+          <div className="divide-y">
+            {campaigns.map((c) => (
+              <div
+                key={c.id}
+                className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/40"
               >
-                <Mail className="h-4 w-4 mr-1" />
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/app/campaigns/${campaign.id}/analytics`);
-                }}
-              >
-                <BarChart className="h-4 w-4 mr-1" />
-                Analytics
-              </Button>
-            </div>
-          </Card>
-        ))}
+                <button
+                  onClick={() => navigate(`/app/campaigns/${c.id}`)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <p className="truncate text-sm font-medium">{c.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {c.subject}
+                  </p>
+                </button>
+
+                <span className="hidden w-32 items-center gap-1.5 font-mono text-xs capitalize text-muted-foreground sm:inline-flex">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${statusDot(c.status)}`}
+                  />
+                  {c.status}
+                </span>
+                <span className="hidden w-24 font-mono text-xs text-muted-foreground sm:block">
+                  {c.sent_at
+                    ? new Date(c.sent_at).toLocaleDateString()
+                    : "—"}
+                </span>
+                <span
+                  className={`h-2 w-2 rounded-full sm:hidden ${statusDot(c.status)}`}
+                />
+
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => navigate(`/app/campaigns/${c.id}`)}
+                  >
+                    <Pencil className="h-4 w-4" strokeWidth={1.75} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() =>
+                      navigate(`/app/campaigns/${c.id}/analytics`)
+                    }
+                  >
+                    <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
