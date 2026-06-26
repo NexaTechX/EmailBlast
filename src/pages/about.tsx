@@ -1,70 +1,137 @@
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Mail, Users, BarChart, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { SiteHeader } from "@/components/landing/site-header";
+import { SiteFooter } from "@/components/landing/site-footer";
+import { CTASection } from "@/components/landing/cta-section";
+import { useAuth } from "@/lib/auth";
+
+const stats = [
+  { value: "2024", label: "Founded" },
+  { value: "10M+", label: "Emails / month" },
+  { value: "12k", label: "Teams" },
+  { value: "40+", label: "Countries" },
+];
+
+const values = [
+  {
+    n: "01",
+    title: "Craft over clutter",
+    body: "We sweat the details most tools ignore — typography, spacing, deliverability. The boring parts done right are a feature.",
+  },
+  {
+    n: "02",
+    title: "Deliverability first",
+    body: "An email that doesn't reach the inbox is worthless. We treat reputation and authentication as core product, not an add-on.",
+  },
+  {
+    n: "03",
+    title: "Built in the open",
+    body: "We ship fast, listen closely, and tell you what changed. Our roadmap is shaped by the teams who use EmailBlast every day.",
+  },
+];
 
 export default function AboutPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const start = () => navigate(user ? "/app" : "/auth");
+
   return (
-    <div className="py-24 sm:py-32">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-base font-semibold leading-7 text-primary">
-            About Us
-          </h2>
-          <p className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            Empowering businesses through effective email marketing
-          </p>
-          <p className="mt-6 text-lg leading-8 text-muted-foreground">
-            EmailBlast was founded with a simple mission: to make email
-            marketing accessible, effective, and enjoyable for businesses of all
-            sizes.
-          </p>
-        </div>
-
-        <div className="mx-auto mt-16 max-w-5xl">
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-            <Card className="p-8">
-              <div className="flex items-center gap-4">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold">Our Mission</h3>
-              </div>
-              <p className="mt-4 text-muted-foreground">
-                We believe that every business deserves access to powerful email
-                marketing tools. Our platform is built to help you grow your
-                audience and engage with your customers effectively.
-              </p>
-            </Card>
-
-            <Card className="p-8">
-              <div className="flex items-center gap-4">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Shield className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold">Our Values</h3>
-              </div>
-              <p className="mt-4 text-muted-foreground">
-                Security, reliability, and user experience are at the core of
-                everything we do. We're committed to providing a platform you
-                can trust with your business.
-              </p>
-            </Card>
+    <div className="min-h-screen bg-background">
+      <SiteHeader />
+      <main className="pt-16">
+        {/* Heading */}
+        <section className="border-b">
+          <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-28">
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              About
+            </p>
+            <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-6xl">
+              The email platform we always wanted to use.
+            </h1>
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+              EmailBlast started with a simple frustration: every email tool felt
+              either too basic or too bloated, and none of them respected the
+              craft of a good campaign. So we built one that does.
+            </p>
           </div>
+        </section>
 
-          <Card className="mt-8 p-8">
-            <div className="text-center">
-              <h3 className="text-2xl font-bold">Ready to get started?</h3>
-              <p className="mt-4 text-muted-foreground">
-                Join thousands of businesses already using EmailBlast to grow
-                their audience.
+        {/* Stats */}
+        <section className="border-b">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-y border-x lg:grid-cols-4 lg:divide-y-0">
+            {stats.map((s) => (
+              <div key={s.label} className="px-6 py-10">
+                <p className="font-mono text-4xl font-semibold tabular-nums tracking-tight sm:text-5xl">
+                  {s.value}
+                </p>
+                <p className="mt-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                  {s.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Values */}
+        <section className="border-b">
+          <div className="mx-auto max-w-7xl px-6 lg:px-8">
+            <div className="border-b py-16">
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                What we believe
               </p>
-              <Button size="lg" className="mt-6">
-                Start Free Trial
-              </Button>
+              <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight sm:text-[2.5rem] sm:leading-[1.1]">
+                Principles we won't compromise on.
+              </h2>
             </div>
-          </Card>
-        </div>
-      </div>
+          </div>
+          <div className="mx-auto grid max-w-7xl grid-cols-1 border-x md:grid-cols-3">
+            {values.map((v, i) => (
+              <div
+                key={v.n}
+                className={`p-8 sm:p-10 ${
+                  i < values.length - 1 ? "border-b md:border-b-0 md:border-r" : ""
+                }`}
+              >
+                <span className="font-mono text-5xl font-semibold tabular-nums text-foreground/15">
+                  {v.n}
+                </span>
+                <h3 className="mt-6 text-lg font-semibold tracking-tight">
+                  {v.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {v.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Story */}
+        <section className="border-b">
+          <div className="mx-auto max-w-3xl px-6 py-20 lg:px-8 lg:py-28">
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Our story
+            </p>
+            <div className="mt-6 space-y-5 text-lg leading-relaxed text-foreground/90">
+              <p>
+                We're a small team of marketers and engineers who spent years
+                fighting our own tools. Reports in one app, design in another,
+                deliverability a black box, and copywriting that always landed on
+                someone's already-full plate.
+              </p>
+              <p>
+                EmailBlast brings it into one place — an{" "}
+                <span className="text-emerald-600">AI copywriter</span>, a real
+                visual builder, live analytics, and deliverability handled for
+                you. The goal is simple: make sending great email feel effortless,
+                so your team can focus on the message, not the machinery.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <CTASection onGetStarted={start} />
+      </main>
+      <SiteFooter />
     </div>
   );
 }
