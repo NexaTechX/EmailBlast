@@ -32,60 +32,10 @@ export async function saveLeads(
   leads: Lead[],
 ): Promise<{ success: boolean; error?: any }> {
   try {
-    // Check if the leads table exists
-    const { error: tableCheckError } = await supabase
-      .from("leads")
-      .select("count")
-      .limit(1);
-
-    // If the table doesn't exist, create it
-    if (tableCheckError && tableCheckError.code === "42P01") {
-      console.log("Leads table does not exist, creating it...");
-      try {
-        await supabase.rpc("exec_sql", {
-          sql_string: `
-            CREATE TABLE IF NOT EXISTS public.leads (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              name TEXT NOT NULL,
-              title TEXT,
-              company TEXT,
-              email TEXT UNIQUE NOT NULL,
-              phone TEXT,
-              linkedin TEXT,
-              website TEXT,
-              industry TEXT,
-              employees TEXT,
-              location TEXT,
-              personal_email TEXT,
-              direct_phone TEXT,
-              mobile TEXT,
-              education TEXT,
-              previous_companies TEXT[],
-              technologies TEXT[],
-              founded TEXT,
-              revenue TEXT,
-              company_size TEXT,
-              interests TEXT[],
-              confidence_score INTEGER,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-            ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
-            CREATE POLICY "Allow all operations for authenticated users on leads" ON public.leads
-              FOR ALL
-              TO authenticated
-              USING (true);
-            ALTER PUBLICATION supabase_realtime ADD TABLE public.leads;
-          `,
-        });
-      } catch (createError) {
-        console.error("Error creating leads table:", createError);
-        // Continue anyway, as the setupDatabase function might have created it already
-      }
-    }
-
-    // Format leads for database insertion
+    // Format leads for database insertion. `user_id` is omitted so the DB
+    // default `auth.user_id()` fills it and RLS passes.
     const formattedLeads = leads.map((lead) => ({
+      id: lead.id,
       name: lead.name,
       title: lead.title,
       company: lead.company,
@@ -111,7 +61,7 @@ export async function saveLeads(
 
     // Insert leads into the database
     const { error } = await supabase.from("leads").upsert(formattedLeads, {
-      onConflict: "email",
+      onConflict: "user_id,email",
       ignoreDuplicates: false,
     });
 

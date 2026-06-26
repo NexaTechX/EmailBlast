@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
 import { Mail, CheckCircle, XCircle, Home } from "lucide-react";
 
 export default function UnsubscribePage() {
@@ -27,35 +26,14 @@ export default function UnsubscribePage() {
     setEmail(emailParam);
 
     try {
-      // Check if already unsubscribed
-      const { data: subscriber } = await supabase
-        .from("subscribers")
-        .select("unsubscribed_at")
-        .eq("email", emailParam)
-        .single();
+      // Unsubscribe is an unauthenticated action, so it runs server-side
+      // (/api/unsubscribe) which updates the subscriber + logs analytics with
+      // elevated DB access. Idempotent: already-unsubscribed still returns 200.
+      const params = new URLSearchParams({ email: emailParam });
+      if (campaignId) params.set("campaign", campaignId);
 
-      if (subscriber?.unsubscribed_at) {
-        setStatus("already");
-        return;
-      }
-
-      // Update subscriber to unsubscribed
-      const { error: updateError } = await supabase
-        .from("subscribers")
-        .update({ unsubscribed_at: new Date().toISOString() })
-        .eq("email", emailParam);
-
-      if (updateError) throw updateError;
-
-      // Log unsubscribe event in analytics if campaign ID provided
-      if (campaignId) {
-        await supabase.from("campaign_analytics").insert({
-          campaign_id: campaignId,
-          email: emailParam,
-          event_type: "unsubscribe",
-          occurred_at: new Date().toISOString(),
-        });
-      }
+      const res = await fetch(`/api/unsubscribe?${params.toString()}`);
+      if (!res.ok) throw new Error(`Unsubscribe failed (${res.status})`);
 
       setStatus("success");
     } catch (error) {

@@ -1,8 +1,8 @@
-// FireCrawl JS integration for web scraping and lead generation
-
-const FIRECRAWL_API_KEY = "fc-01e68c0f41394d9491ec4d0e2fdfef75";
+// FireCrawl JS integration for web scraping and lead generation.
+// Calls go through our server proxy (/api/scrape); key stays server-side.
 
 import { Lead } from "./gemini-api";
+import { firecrawlFetch } from "./firecrawl-client";
 
 /**
  * Scrape a URL using the FireCrawl JS library
@@ -33,12 +33,7 @@ export async function scrapeUrlWithFireCrawl(
       ignoreSitemap,
     };
 
-    const response = await fetch(`https://api.firecrawl.dev/v1/scrape`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-      },
+    const response = await firecrawlFetch("scrape", {
       body: JSON.stringify(requestBody),
     });
 
@@ -78,12 +73,7 @@ export async function mapWebsiteWithFireCrawl(
       ignoreSitemap,
     };
 
-    const response = await fetch(`https://api.firecrawl.dev/v1/map`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-      },
+    const response = await firecrawlFetch("map", {
       body: JSON.stringify(requestBody),
     });
 

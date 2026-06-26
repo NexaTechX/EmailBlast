@@ -821,48 +821,9 @@ export function LeadFinderTool() {
     if (selectedLeads.length === 0) return;
 
     try {
-      // Check if the subscribers table exists
-      const { error: tableCheckError } = await supabase
-        .from("subscribers")
-        .select("count")
-        .limit(1);
-
-      // If the table doesn't exist, create it
-      if (tableCheckError && tableCheckError.code === "42P01") {
-        console.log("Subscribers table does not exist, creating it...");
-        try {
-          await supabase.rpc("exec_sql", {
-            sql_string: `
-              CREATE TABLE IF NOT EXISTS public.subscribers (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                email TEXT UNIQUE NOT NULL,
-                first_name TEXT,
-                last_name TEXT,
-                phone TEXT,
-                company TEXT,
-                job_title TEXT,
-                tags TEXT[],
-                metadata JSONB,
-                subscribed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                unsubscribed_at TIMESTAMP WITH TIME ZONE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-              );
-              ALTER TABLE public.subscribers ENABLE ROW LEVEL SECURITY;
-              CREATE POLICY "Allow all operations for authenticated users on subscribers" ON public.subscribers
-                FOR ALL
-                TO authenticated
-                USING (true);
-              ALTER PUBLICATION supabase_realtime ADD TABLE public.subscribers;
-            `,
-          });
-        } catch (createError) {
-          console.error("Error creating subscribers table:", createError);
-          // Continue anyway, as the setupDatabase function might have created it already
-        }
-      }
-
-      // Add selected leads to subscribers table
+      // Add selected leads to subscribers table. `user_id` is omitted so the
+      // DB default `auth.user_id()` fills it and RLS passes. company/title/phone
+      // are not columns on `subscribers`, so they go into metadata.
       const leadsToAdd = selectedLeads
         .map((id) => {
           const lead = searchResults.find((l) => l.id === id);
@@ -872,12 +833,12 @@ export function LeadFinderTool() {
             email: lead.email?.toLowerCase(),
             first_name: lead.name?.split(" ")[0] || "",
             last_name: lead.name?.split(" ").slice(1).join(" ") || "",
-            company: lead.company || "",
-            job_title: lead.title || "",
-            phone: lead.phone || "",
             tags: ["lead-finder"],
             metadata: {
               source: "lead-finder",
+              company: lead.company || "",
+              job_title: lead.title || "",
+              phone: lead.phone || "",
               industry: lead.industry,
               linkedin: lead.linkedin,
               website: lead.website,
@@ -902,7 +863,7 @@ export function LeadFinderTool() {
       }
 
       const { error } = await supabase.from("subscribers").upsert(leadsToAdd, {
-        onConflict: "email",
+        onConflict: "user_id,email",
         ignoreDuplicates: false,
       });
 

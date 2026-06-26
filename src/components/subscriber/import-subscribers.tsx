@@ -78,9 +78,9 @@ export function ImportSubscribers() {
       let failed = 0;
       const errors: string[] = [];
 
-      // Database tables should already be set up by setupDatabase in App.tsx
-
-      // Process subscribers in batches
+      // Process subscribers in batches. `user_id` is omitted so the DB default
+      // `auth.user_id()` fills it and RLS passes. phone/company/job_title are not
+      // columns on `subscribers`, so they go into metadata.
       const batchSize = 100;
       for (let i = 0; i < subscribers.length; i += batchSize) {
         const batch = subscribers.slice(i, i + batchSize);
@@ -88,15 +88,17 @@ export function ImportSubscribers() {
           email: sub.email?.toLowerCase().trim(),
           first_name: sub.first_name || sub.firstName || sub.firstname || "",
           last_name: sub.last_name || sub.lastName || sub.lastname || "",
-          phone: sub.phone || sub.phoneNumber || sub.phone_number || "",
-          company: sub.company || sub.organization || "",
-          job_title:
-            sub.job_title || sub.jobTitle || sub.title || sub.position || "",
           tags: sub.tags
             ? typeof sub.tags === "string"
               ? [sub.tags]
               : sub.tags
             : [],
+          metadata: {
+            phone: sub.phone || sub.phoneNumber || sub.phone_number || "",
+            company: sub.company || sub.organization || "",
+            job_title:
+              sub.job_title || sub.jobTitle || sub.title || sub.position || "",
+          },
         }));
 
         // Filter out invalid emails
@@ -114,7 +116,7 @@ export function ImportSubscribers() {
           const { error } = await supabase
             .from("subscribers")
             .upsert(validBatch, {
-              onConflict: "email",
+              onConflict: "user_id,email",
               ignoreDuplicates: false,
             });
 
