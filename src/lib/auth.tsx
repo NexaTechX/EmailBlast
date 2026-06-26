@@ -16,9 +16,14 @@ type AuthContextType = {
   signUp: (
     email: string,
     password: string,
+    name?: string,
   ) => Promise<{ needsVerification: boolean }>;
   signOut: () => Promise<void>;
-  verifyEmailOtp: (email: string, token: string) => Promise<void>;
+  verifyEmailOtp: (
+    email: string,
+    token: string,
+    password?: string,
+  ) => Promise<{ hasSession: boolean }>;
   resendVerification: (email: string) => Promise<void>;
   sendVerificationEmail: (email: string) => Promise<void>;
 };
@@ -85,12 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (
     email: string,
     password: string,
+    name?: string,
   ): Promise<{ needsVerification: boolean }> => {
     const { data, error } = await client.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: name ? { displayName: name } : undefined,
       },
     });
     if (error) {
@@ -123,14 +130,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
-  // Verify the email OTP code the user received, which establishes a session.
-  const verifyEmailOtp = async (email: string, token: string) => {
-    const { error } = await client.auth.verifyOtp({
+  // Verify the email code the user received and make sure a session is open.
+  // A password signup issues an *email-verification* OTP, verified with the
+  // "signup" type (Better Auth emailOtp.verifyEmail). A passwordless flow would
+  // instead issue a sign-in OTP ("email" / signIn.emailOtp), so fall back to
+  // that if the signup verification is rejected. The signup path can confirm
+  // the email without opening a session, so we sign in with the password to
+  // guarantee one and report whether we have it.
+  const verifyEmailOtp = async (
+    email: string,
+    token: string,
+    password?: string,
+  ): Promise<{ hasSession: boolean }> => {
+    const signupResult = await client.auth.verifyOtp({
       email,
       token,
-      type: "email",
+      type: "signup",
     });
-    if (error) throw error;
+    if (signupResult.error) {
+      const emailResult = await client.auth.verifyOtp({
+        email,
+        token,
+        type: "email",
+      });
+      if (emailResult.error) throw emailResult.error;
+    }
+
+    let session = (await client.auth.getSession()).data.session;
+    if (!session && password) {
+      try {
+        await client.auth.signInWithPassword({ email, password });
+        session = (await client.auth.getSession()).data.session;
+      } catch (signInError) {
+        console.warn("Sign-in after verification failed:", signInError);
+      }
+    }
+    return { hasSession: Boolean(session) };
   };
 
   // Re-send the verification email / code.

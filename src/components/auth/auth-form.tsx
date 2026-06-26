@@ -37,6 +37,7 @@ function LabeledInput({
 // Sign-in / sign-up form with an inline email-verification (OTP) step.
 export function AuthForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,11 @@ export function AuthForm() {
         await signIn(email, password);
         navigate("/app");
       } else {
-        const { needsVerification } = await signUp(email, password);
+        const { needsVerification } = await signUp(
+          email,
+          password,
+          name.trim() || undefined,
+        );
         if (needsVerification) {
           setPendingEmail(email);
         } else {
@@ -85,9 +90,26 @@ export function AuthForm() {
     if (!pendingEmail) return;
     setVerifying(true);
     try {
-      await verifyEmailOtp(pendingEmail, code.trim());
-      toast({ title: "Email verified", description: "Welcome to EmailBlast." });
-      navigate("/app");
+      const { hasSession } = await verifyEmailOtp(
+        pendingEmail,
+        code.trim(),
+        password,
+      );
+      if (hasSession) {
+        toast({ title: "Email verified", description: "Welcome to EmailBlast." });
+        navigate("/app");
+      } else {
+        // Email is verified but no session was opened (e.g. the password isn't
+        // in state after a reload). Send them to sign in rather than bounce off
+        // a protected route.
+        toast({
+          title: "Email verified",
+          description: "Please sign in to continue.",
+        });
+        setPendingEmail(null);
+        setCode("");
+        setMode("login");
+      }
     } catch (error) {
       console.error("Verification error:", error);
       toast({
@@ -214,6 +236,19 @@ export function AuthForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {mode === "register" && (
+          <LabeledInput
+            id="name"
+            label="Name"
+            type="text"
+            autoComplete="name"
+            placeholder="Jane Doe"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        )}
+
         <LabeledInput
           id="email"
           label="Email"
