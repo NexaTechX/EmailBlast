@@ -4,4 +4,9 @@ import { neon } from "@neondatabase/serverless";
 // DATABASE_URL (never shipped to the client) and therefore bypasses RLS — these
 // endpoints run for unauthenticated callers (tracking pixels, unsubscribe links,
 // provider webhooks), so they must scope writes explicitly in SQL.
-export const sql = neon(process.env.DATABASE_URL!);
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set");
+}
+
+export const sql = neon(databaseUrl);

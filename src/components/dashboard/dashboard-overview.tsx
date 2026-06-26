@@ -1,8 +1,13 @@
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Mail, Users, BarChart, ArrowRight, TrendingUp, Clock } from "lucide-react";
+import {
+  Send,
+  Users,
+  BarChart3,
+  ArrowUpRight,
+  Radar,
+  Plus,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WelcomeModal } from "@/components/onboarding/welcome-modal";
@@ -95,36 +100,71 @@ export function DashboardOverview() {
     }
   };
 
-  const getStatusColor = (status: Campaign["status"]) => {
+  const statusDot = (status: Campaign["status"]) => {
     switch (status) {
-      case "draft":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
-      case "scheduled":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-      case "sending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
       case "sent":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+        return "bg-emerald-500";
+      case "sending":
+        return "bg-amber-500";
+      case "scheduled":
+        return "bg-sky-500";
       case "failed":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+        return "bg-red-500";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted-foreground/40";
     }
   };
 
+  const statTiles = [
+    {
+      label: "Campaigns",
+      value: stats.totalCampaigns,
+      sub:
+        stats.activeCampaigns > 0
+          ? `${stats.activeCampaigns} active`
+          : "All time",
+      to: "/app/campaigns",
+    },
+    {
+      label: "Subscribers",
+      value: stats.activeSubscribers,
+      sub:
+        stats.totalSubscribers !== stats.activeSubscribers
+          ? `${stats.totalSubscribers - stats.activeSubscribers} unsubscribed`
+          : "Active",
+      to: "/app/subscribers",
+    },
+    {
+      label: "Open rate",
+      value: `${stats.averageOpenRate}%`,
+      sub: "Average",
+      to: "/app/analytics",
+    },
+    {
+      label: "Click rate",
+      value: `${stats.averageClickRate}%`,
+      sub: "Average",
+      to: "/app/analytics",
+    },
+  ];
+
+  const quickActions = [
+    { label: "Create campaign", icon: Send, to: "/app/campaigns/new" },
+    { label: "Import subscribers", icon: Users, to: "/app/subscribers" },
+    { label: "View analytics", icon: BarChart3, to: "/app/analytics" },
+    { label: "Find new leads", icon: Radar, to: "/app/lead-finder" },
+  ];
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="p-6">
-              <div className="animate-pulse space-y-4">
-                <div className="h-4 bg-muted rounded w-1/2"></div>
-                <div className="h-8 bg-muted rounded w-3/4"></div>
-                <div className="h-3 bg-muted rounded w-2/3"></div>
-              </div>
-            </Card>
+      <div className="space-y-8">
+        <div className="h-8 w-40 animate-pulse rounded bg-muted" />
+        <div className="grid grid-cols-2 divide-x divide-y border lg:grid-cols-4 lg:divide-y-0">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="space-y-3 p-6">
+              <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+              <div className="h-8 w-16 animate-pulse rounded bg-muted" />
+            </div>
           ))}
         </div>
       </div>
@@ -134,185 +174,148 @@ export function DashboardOverview() {
   return (
     <>
       <WelcomeModal />
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Overview
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+              Dashboard
+            </h2>
+          </div>
           <Button onClick={() => navigate("/app/campaigns/new")}>
-            <Mail className="mr-2 h-4 w-4" />
-            New Campaign
+            <Plus className="mr-1.5 h-4 w-4" />
+            New campaign
           </Button>
         </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="p-6 bg-background border border-border">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Campaigns</h3>
-            </div>
-            {stats.activeCampaigns > 0 && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {stats.activeCampaigns} active
-              </Badge>
-            )}
-          </div>
-          <p className="mt-4 text-4xl font-bold">{stats.totalCampaigns}</p>
-          <p className="text-sm text-muted-foreground">Total campaigns</p>
-          <Button
-            variant="link"
-            className="mt-4 p-0 text-primary hover:text-primary/80"
-            onClick={() => navigate("/app/campaigns")}
-          >
-            View all campaigns <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Card>
+        {/* Stat tiles — ruled grid */}
+        <div className="grid grid-cols-2 divide-x divide-y border lg:grid-cols-4 lg:divide-y-0">
+          {statTiles.map((t) => (
+            <button
+              key={t.label}
+              onClick={() => navigate(t.to)}
+              className="group p-6 text-left transition-colors hover:bg-muted/40"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                {t.label}
+              </p>
+              <p className="mt-2 font-mono text-3xl font-semibold tabular-nums tracking-tight">
+                {t.value}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{t.sub}</p>
+            </button>
+          ))}
+        </div>
 
-        <Card className="p-6 bg-background border border-border">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Subscribers</h3>
-          </div>
-          <p className="mt-4 text-4xl font-bold">{stats.activeSubscribers}</p>
-          <p className="text-sm text-muted-foreground">
-            Active subscribers
-            {stats.totalSubscribers !== stats.activeSubscribers && (
-              <span className="ml-1">
-                ({stats.totalSubscribers - stats.activeSubscribers} unsubscribed)
-              </span>
-            )}
-          </p>
-          <Button
-            variant="link"
-            className="mt-4 p-0 text-primary hover:text-primary/80"
-            onClick={() => navigate("/app/subscribers")}
-          >
-            Manage subscribers <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Card>
-
-        <Card className="p-6 bg-background border border-border">
-          <div className="flex items-center gap-2">
-            <BarChart className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Performance</h3>
-          </div>
-          <p className="mt-4 text-4xl font-bold">{stats.averageOpenRate}%</p>
-          <p className="text-sm text-muted-foreground">
-            Average open rate
-            {stats.averageClickRate > 0 && (
-              <span className="ml-1">• {stats.averageClickRate}% CTR</span>
-            )}
-          </p>
-          <Button
-            variant="link"
-            className="mt-4 p-0 text-primary hover:text-primary/80"
-            onClick={() => navigate("/app/analytics")}
-          >
-            View analytics <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6 bg-background border border-border">
-          <h3 className="font-semibold mb-4">Recent Campaigns</h3>
-          {recentCampaigns.length > 0 ? (
-            <div className="space-y-3">
-              {recentCampaigns.map((campaign) => (
-                <div
-                  key={campaign.id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/app/campaigns/${campaign.id}`)}
+        {/* Recent + quick actions */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
+          {/* Recent campaigns */}
+          <div className="border">
+            <div className="flex items-center justify-between border-b px-5 py-3.5">
+              <h3 className="text-sm font-semibold">Recent campaigns</h3>
+              {recentCampaigns.length > 0 && (
+                <button
+                  onClick={() => navigate("/app/campaigns")}
+                  className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{campaign.title}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {campaign.subject}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <Badge className={getStatusColor(campaign.status)}>
-                      {campaign.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                className="w-full mt-2"
-                onClick={() => navigate("/app/campaigns")}
-              >
-                View all campaigns
-              </Button>
+                  View all <ArrowUpRight className="h-3 w-3" />
+                </button>
+              )}
             </div>
-          ) : (
-            <div>
-              <div className="text-center py-8 text-muted-foreground">
-                <Mail className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p className="mb-2">No campaigns yet</p>
-                <p className="text-sm">Create your first email campaign to get started</p>
-              </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate("/app/campaigns/new")}
-              >
-                Create your first campaign
-              </Button>
-            </div>
-          )}
-        </Card>
 
-        <Card className="p-6 bg-background border border-border">
-          <h3 className="font-semibold mb-4">Quick Actions</h3>
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate("/app/campaigns/new")}
-            >
-              <Mail className="mr-2 h-4 w-4" />
-              Create New Campaign
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate("/app/subscribers")}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Import Subscribers
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate("/app/analytics")}
-            >
-              <BarChart className="mr-2 h-4 w-4" />
-              View Analytics
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate("/app/lead-finder")}
-            >
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Find New Leads
-            </Button>
+            {recentCampaigns.length > 0 ? (
+              <div className="divide-y">
+                {recentCampaigns.map((campaign) => (
+                  <button
+                    key={campaign.id}
+                    onClick={() => navigate(`/app/campaigns/${campaign.id}`)}
+                    className="flex w-full items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-muted/40"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {campaign.title}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {campaign.subject}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${statusDot(campaign.status)}`}
+                      />
+                      {campaign.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="px-5 py-14 text-center">
+                <Send className="mx-auto h-8 w-8 text-muted-foreground/40" />
+                <p className="mt-3 text-sm font-medium">No campaigns yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Create your first email campaign to get started.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-5"
+                  onClick={() => navigate("/app/campaigns/new")}
+                >
+                  Create your first campaign
+                </Button>
+              </div>
+            )}
           </div>
-          
-          {stats.totalCampaigns === 0 && stats.totalSubscribers === 0 && (
-            <div className="mt-6 p-4 border rounded-lg bg-primary/5">
-              <h4 className="font-medium mb-2 text-sm">Getting Started</h4>
-              <ol className="text-sm text-muted-foreground space-y-2 list-decimal pl-4">
-                <li>Import or add subscribers</li>
-                <li>Create your first campaign</li>
-                <li>Preview and test your email</li>
-                <li>Send to your audience</li>
-              </ol>
+
+          {/* Quick actions */}
+          <div className="border">
+            <div className="border-b px-5 py-3.5">
+              <h3 className="text-sm font-semibold">Quick actions</h3>
             </div>
-          )}
-        </Card>
-      </div>
+            <div className="divide-y">
+              {quickActions.map((a) => (
+                <button
+                  key={a.label}
+                  onClick={() => navigate(a.to)}
+                  className="group flex w-full items-center gap-3 px-5 py-3.5 text-left text-sm transition-colors hover:bg-muted/40"
+                >
+                  <a.icon
+                    className="h-[18px] w-[18px] text-muted-foreground"
+                    strokeWidth={1.75}
+                  />
+                  <span className="flex-1 font-medium">{a.label}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+                </button>
+              ))}
+            </div>
+
+            {stats.totalCampaigns === 0 && stats.totalSubscribers === 0 && (
+              <div className="border-t bg-muted/30 px-5 py-4">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Getting started
+                </p>
+                <ol className="mt-3 space-y-2 text-xs text-muted-foreground">
+                  {[
+                    "Import or add subscribers",
+                    "Create your first campaign",
+                    "Preview and send a test",
+                    "Send to your audience",
+                  ].map((step, i) => (
+                    <li key={step} className="flex items-center gap-2.5">
+                      <span className="font-mono text-foreground/40">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </>
   );

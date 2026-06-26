@@ -8,6 +8,7 @@ type FirecrawlInit = {
   body?: string;
 };
 
+/** Route a Firecrawl request through the server proxy (/api/scrape). */
 export function firecrawlFetch(
   path: "scrape" | "map" | "search",
   init: FirecrawlInit = {},

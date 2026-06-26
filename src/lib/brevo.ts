@@ -17,7 +17,7 @@ async function postJson(path: string, body: unknown) {
   return res.json();
 }
 
-export async function sendCampaign(campaign: Campaign, subscribers: string[]) {
+export function sendCampaign(campaign: Campaign, subscribers: string[]) {
   return postJson("/api/send", {
     campaignId: campaign.id,
     subject: campaign.subject,
@@ -27,7 +27,7 @@ export async function sendCampaign(campaign: Campaign, subscribers: string[]) {
   });
 }
 
-export async function sendTestEmail(campaign: Campaign, testEmail: string) {
+export function sendTestEmail(campaign: Campaign, testEmail: string) {
   return postJson("/api/send-test", {
     subject: `[TEST] ${campaign.subject}`,
     html: campaign.content,

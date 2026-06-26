@@ -49,11 +49,14 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  // useRoutes must be called unconditionally (Rules of Hooks); only render it under Tempo.
+  const tempoRoutes = useRoutes(routes);
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="ui-theme">
       <AuthProvider>
         <Suspense fallback={<p>Loading...</p>}>
-          {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
+          {import.meta.env.VITE_TEMPO === "true" && tempoRoutes}
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />

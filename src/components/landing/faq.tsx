@@ -38,7 +38,7 @@ export function FAQ() {
             Questions, answered.
           </h2>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-            Can't find what you're looking for?{" "}
+            Can&apos;t find what you&apos;re looking for?{" "}
             <span className="cursor-pointer text-foreground underline underline-offset-4">
               Talk to us
             </span>

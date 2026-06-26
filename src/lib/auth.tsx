@@ -6,7 +6,6 @@ type AuthUser = {
   id: string;
   email?: string | null;
   email_confirmed_at?: string | null;
-  [key: string]: any;
 };
 
 type AuthContextType = {
@@ -14,7 +13,10 @@ type AuthContextType = {
   loading: boolean;
   isEmailVerified: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (
+    email: string,
+    password: string,
+  ) => Promise<{ needsVerification: boolean }>;
   signOut: () => Promise<void>;
   sendVerificationEmail: (email: string) => Promise<void>;
 };
@@ -75,16 +77,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await client.auth.signUp({
+  const signUp = async (
+    email: string,
+    password: string,
+  ): Promise<{ needsVerification: boolean }> => {
+    const { data, error } = await client.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    if (error) throw error;
+    if (error) {
+      // Neon Auth created the account but issued no session — this happens when
+      // email verification is required. Treat it as "verification pending"
+      // rather than a hard failure (the account already exists).
+      if (
+        /retrieve user session|session.{0,3}not.{0,3}found/i.test(
+          error.message ?? "",
+        )
+      ) {
+        return { needsVerification: true };
+      }
+      throw error;
+    }
+    // No error: a session exists only when verification is NOT required.
     // Profile creation is handled by ensureProfile() on the resulting session.
+    return { needsVerification: !data?.session };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -97,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
-  const sendVerificationEmail = async (_email: string) => {
+  const sendVerificationEmail = (_email: string): Promise<void> => {
     // Email verification is handled by Neon Auth's built-in flow.
     return Promise.resolve();
   };

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowUpRight, Check } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { DemoModal } from "@/components/demo-modal";
@@ -83,9 +83,9 @@ export function Hero({ onGetStarted }: HeroProps) {
             className="mt-10 flex items-center gap-5 border-t pt-6"
           >
             <div className="flex -space-x-2">
-              {["A", "M", "K", "R"].map((c, i) => (
+              {["A", "M", "K", "R"].map((c) => (
                 <div
-                  key={i}
+                  key={c}
                   className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground"
                 >
                   {c}

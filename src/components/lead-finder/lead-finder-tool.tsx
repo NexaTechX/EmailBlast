@@ -878,14 +878,16 @@ export function LeadFinderTool() {
       });
 
       setSelectedLeads([]);
-    } catch (error: any) {
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to add leads to subscribers. Please try again.";
       console.error("Error adding leads to subscribers:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description:
-          error.message ||
-          "Failed to add leads to subscribers. Please try again.",
+        description: message,
       });
     }
   };
@@ -904,9 +906,6 @@ export function LeadFinderTool() {
       const confidenceThreshold =
         (document.getElementById("confidence-threshold") as HTMLSelectElement)
           ?.value || "medium";
-      const dataPoints =
-        (document.getElementById("data-points") as HTMLSelectElement)?.value ||
-        "all";
 
       // Create a copy of the search results
       const enrichedResults = [...searchResults];
@@ -1055,8 +1054,8 @@ export function LeadFinderTool() {
                 enrichedResults[index].linkedin ||
                 `linkedin.com/in/${enrichedResults[index].name.toLowerCase().replace(/ /g, "-")}`,
               twitter: `twitter.com/${enrichedResults[index].name.split(" ")[0].toLowerCase()}${Math.floor(Math.random() * 1000)}`,
-              revenue: revenue,
-              companySize: companySize,
+              revenue,
+              companySize,
               founded: foundedYear.toString(),
               technologies: technologies.slice(
                 0,

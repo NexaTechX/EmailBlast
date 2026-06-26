@@ -12,14 +12,28 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const CONTENT_MODEL = "openai/gpt-oss-120b";
 const LEADS_MODEL = "openai/gpt-oss-20b";
 
-// Strip ```html / ``` fences a model sometimes wraps content in.
+type AiBody = {
+  action?: string;
+  prompt?: string;
+  instructions?: string;
+  content?: string;
+  query?: string;
+  count?: number;
+  domains?: string[];
+  leads?: unknown[];
+};
+
+/** Strip ```html / ``` fences a model sometimes wraps content in. */
 function stripFences(text: string): string {
-  const t = text.trim();
-  if (t.includes("```html")) return t.split("```html")[1].split("```")[0].trim();
-  if (t.includes("```")) return t.split("```")[1].split("```")[0].trim();
-  return t;
+  const trimmed = text.trim();
+  if (trimmed.includes("```html"))
+    return trimmed.split("```html")[1].split("```")[0].trim();
+  if (trimmed.includes("```"))
+    return trimmed.split("```")[1].split("```")[0].trim();
+  return trimmed;
 }
 
+/** Run a single Groq chat completion and return the assistant's message content. */
 async function chat(
   model: string,
   system: string,
@@ -42,14 +56,15 @@ async function chat(
 const COPY_SYSTEM =
   "You are an expert email-marketing copywriter. Return ONLY the requested HTML — no explanations, no markdown code fences.";
 const LEADS_SYSTEM =
-  "You generate realistic sample business leads as STRICT JSON. Always return a single JSON object with a top-level \"leads\" array. No prose, no markdown.";
+  'You generate realistic sample business leads as STRICT JSON. Always return a single JSON object with a top-level "leads" array. No prose, no markdown.';
 
+/** POST /api/ai — dispatches each AI feature to the right Groq model. */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const body = (req.body || {}) as { action?: string; [k: string]: any };
+  const body = (req.body || {}) as AiBody;
   const { action } = body;
 
   try {
@@ -59,9 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await chat(
             CONTENT_MODEL,
             COPY_SYSTEM,
-            `Generate HTML content for an email marketing campaign based on this prompt: "${body.prompt}". ` +
-              `Use proper HTML tags (h1, h2, p, ul, li, etc.). Make it professional, engaging, and optimized for email. ` +
-              `Include greeting, body, a clear call-to-action, and a signature. Return ONLY the HTML.`,
+            `Generate HTML content for an email marketing campaign based on this prompt: "${body.prompt}". Use proper HTML tags (h1, h2, p, ul, li, etc.). Make it professional, engaging, and optimized for email. Include greeting, body, a clear call-to-action, and a signature. Return ONLY the HTML.`,
           ),
         );
         return res.status(200).json({ content: html });
@@ -72,8 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await chat(
             CONTENT_MODEL,
             COPY_SYSTEM,
-            `Enhance the following HTML email content according to these instructions: "${body.instructions}".\n\n` +
-              `Original content:\n${body.content}\n\nReturn ONLY the enhanced HTML.`,
+            `Enhance the following HTML email content according to these instructions: "${body.instructions}".\n\nOriginal content:\n${body.content}\n\nReturn ONLY the enhanced HTML.`,
           ),
         );
         return res.status(200).json({ content: html });
@@ -83,9 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const raw = await chat(
           LEADS_MODEL,
           LEADS_SYSTEM,
-          `Generate ${body.count ?? 5} realistic business leads for the search query: "${body.query}". ` +
-            `Each lead object must have: name, title, company, email, phone, linkedin, website, industry, employees, location. ` +
-            `Respond as {"leads": [ ... ]}.`,
+          `Generate ${body.count ?? 5} realistic business leads for the search query: "${body.query}". Each lead object must have: name, title, company, email, phone, linkedin, website, industry, employees, location. Respond as {"leads": [ ... ]}.`,
           true,
         );
         return res.status(200).json({ leads: JSON.parse(raw).leads ?? [] });
@@ -96,10 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const raw = await chat(
           LEADS_MODEL,
           LEADS_SYSTEM,
-          `Generate realistic business leads for these company domains: ${domains.join(", ")}. ` +
-            `For each domain create 1-3 leads for key decision makers (C-level, VP, Director, Manager). ` +
-            `Each lead must have: name, title, company, email (using the domain), phone, linkedin, website, industry, employees, location. ` +
-            `Respond as {"leads": [ ... ]}.`,
+          `Generate realistic business leads for these company domains: ${domains.join(", ")}. For each domain create 1-3 leads for key decision makers (C-level, VP, Director, Manager). Each lead must have: name, title, company, email (using the domain), phone, linkedin, website, industry, employees, location. Respond as {"leads": [ ... ]}.`,
           true,
         );
         return res.status(200).json({ leads: JSON.parse(raw).leads ?? [] });
@@ -110,9 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const raw = await chat(
           LEADS_MODEL,
           LEADS_SYSTEM,
-          `Enrich these business leads with: personalEmail, directPhone, mobile, education, previousCompanies (array), ` +
-            `technologies (array), founded, revenue, companySize, interests (array), confidenceScore (50-100). ` +
-            `Keep existing fields. Leads: ${JSON.stringify(leads)}. Respond as {"leads": [ ... ]}.`,
+          `Enrich these business leads with: personalEmail, directPhone, mobile, education, previousCompanies (array), technologies (array), founded, revenue, companySize, interests (array), confidenceScore (50-100). Keep existing fields. Leads: ${JSON.stringify(leads)}. Respond as {"leads": [ ... ]}.`,
           true,
         );
         return res.status(200).json({ leads: JSON.parse(raw).leads ?? leads });
@@ -121,8 +126,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "AI request failed";
     console.error("ai error", action, err);
-    return res.status(500).json({ error: err?.message || "AI request failed" });
+    return res.status(500).json({ error: message });
   }
 }

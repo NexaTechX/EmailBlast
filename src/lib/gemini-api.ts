@@ -27,7 +27,8 @@ export interface Lead {
   confidenceScore?: number;
 }
 
-async function callAi(body: Record<string, unknown>): Promise<any> {
+/** POST a request to the server-side AI endpoint (/api/ai) and return its JSON. */
+async function callAi<T>(body: Record<string, unknown>): Promise<T> {
   const res = await fetch("/api/ai", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -37,19 +38,28 @@ async function callAi(body: Record<string, unknown>): Promise<any> {
     const detail = await res.text().catch(() => "");
     throw new Error(`AI request failed (${res.status}): ${detail}`);
   }
-  return res.json();
+  return res.json() as Promise<T>;
 }
 
+/** Generate HTML email content from a prompt (via the server-side AI). */
 export async function generateContentWithGemini(prompt: string): Promise<string> {
-  const { content } = await callAi({ action: "generate_content", prompt });
+  const { content } = await callAi<{ content: string }>({
+    action: "generate_content",
+    prompt,
+  });
   return content;
 }
 
+/** Rewrite existing HTML email content per instructions (via the server-side AI). */
 export async function enhanceContentWithGemini(
   content: string,
   instructions: string,
 ): Promise<string> {
-  const data = await callAi({ action: "enhance_content", content, instructions });
+  const data = await callAi<{ content: string }>({
+    action: "enhance_content",
+    content,
+    instructions,
+  });
   return data.content;
 }
 
@@ -58,7 +68,11 @@ export async function generateLeadsWithGemini(
   count: number = 5,
 ): Promise<Lead[]> {
   try {
-    const { leads } = await callAi({ action: "generate_leads", query, count });
+    const { leads } = await callAi<{ leads: Lead[] }>({
+      action: "generate_leads",
+      query,
+      count,
+    });
     return leads as Lead[];
   } catch (error) {
     console.error("Error generating leads:", error);
@@ -70,7 +84,10 @@ export async function generateDomainLeadsWithGemini(
   domains: string[],
 ): Promise<Lead[]> {
   try {
-    const { leads } = await callAi({ action: "generate_domain_leads", domains });
+    const { leads } = await callAi<{ leads: Lead[] }>({
+      action: "generate_domain_leads",
+      domains,
+    });
     return leads as Lead[];
   } catch (error) {
     console.error("Error generating domain leads:", error);
@@ -80,7 +97,10 @@ export async function generateDomainLeadsWithGemini(
 
 export async function enrichLeadsWithGemini(leads: Lead[]): Promise<Lead[]> {
   try {
-    const { leads: enriched } = await callAi({ action: "enrich_leads", leads });
+    const { leads: enriched } = await callAi<{ leads: Lead[] }>({
+      action: "enrich_leads",
+      leads,
+    });
     return enriched as Lead[];
   } catch (error) {
     console.error("Error enriching leads:", error);

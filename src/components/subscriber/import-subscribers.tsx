@@ -234,8 +234,9 @@ export function ImportSubscribers() {
               onChange={(e) => setCsvData(e.target.value)}
             />
             <p className="text-sm text-muted-foreground">
-              CSV should include at least an 'email' column. Other recognized
-              columns: first_name, last_name, phone, company, job_title, tags.
+              CSV should include at least an &apos;email&apos; column. Other
+              recognized columns: first_name, last_name, phone, company,
+              job_title, tags.
             </p>
           </div>
 

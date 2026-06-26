@@ -7,7 +7,8 @@ interface CreateCheckoutParams {
   productId: string;
 }
 
-export async function createCheckoutSession(
+/** Stub: Creem checkout is disabled until payments are re-enabled server-side. */
+export function createCheckoutSession(
   _params: CreateCheckoutParams,
 ): Promise<void> {
   throw new Error(

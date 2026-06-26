@@ -16,16 +16,24 @@ const EVENT_MAP: Record<string, string> = {
   "email.complained": "unsubscribe",
 };
 
-function extractCampaignId(data: any): string | undefined {
+type Tag = { name?: string; value?: string };
+
+/** Pull a campaign id out of a Resend event's tags (array or object form). */
+function extractCampaignId(
+  data: Record<string, unknown> | undefined,
+): string | undefined {
   const tags = data?.tags;
   if (!tags) return undefined;
   if (Array.isArray(tags)) {
-    return tags.find((t: any) => t?.name === "campaign_id")?.value;
+    return (tags as Tag[]).find((t) => t?.name === "campaign_id")?.value;
   }
-  if (typeof tags === "object") return tags.campaign_id;
+  if (typeof tags === "object") {
+    return (tags as { campaign_id?: string }).campaign_id;
+  }
   return undefined;
 }
 
+/** POST /api/webhooks/resend — record provider delivery events into analytics. */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });

@@ -13,8 +13,8 @@ export function Testimonials() {
             <blockquote className="max-w-4xl text-2xl font-medium leading-[1.35] tracking-tight sm:text-[2rem] sm:leading-[1.3]">
               “We replaced three tools with EmailBlast and{" "}
               <span className="text-emerald-600">doubled our open rates</span> in
-              a single quarter. It's the first email platform that feels built by
-              people who actually send email.”
+              a single quarter. It&apos;s the first email platform that feels
+              built by people who actually send email.”
             </blockquote>
 
             <figcaption className="mt-10 flex items-center gap-4">

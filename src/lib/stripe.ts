@@ -6,10 +6,12 @@
 const PAYMENTS_DISABLED =
   "Payments are temporarily disabled while we finish migrating the backend.";
 
-export async function createCheckoutSession(_priceId: string): Promise<void> {
+/** Stub: Stripe checkout is disabled until payments are re-enabled server-side. */
+export function createCheckoutSession(_priceId: string): Promise<void> {
   throw new Error(PAYMENTS_DISABLED);
 }
 
-export async function createPortalSession(): Promise<void> {
+/** Stub: Stripe billing portal is disabled until payments are re-enabled. */
+export function createPortalSession(): Promise<void> {
   throw new Error(PAYMENTS_DISABLED);
 }

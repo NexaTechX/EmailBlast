@@ -215,7 +215,10 @@ export function AIContentGenerator({
         <div className="space-y-3">
           <h4 className="text-sm font-medium">AI Suggestions</h4>
           {suggestions.map((suggestion, index) => (
-            <Card key={index} className="p-3 hover:bg-muted/50 cursor-pointer">
+            <Card
+              key={`suggestion-${index}-${suggestion.slice(0, 24)}`}
+              className="p-3 hover:bg-muted/50 cursor-pointer"
+            >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center">
                   <Lightbulb className="h-4 w-4 mr-2 text-amber-500" />

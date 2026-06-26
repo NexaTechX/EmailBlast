@@ -29,7 +29,7 @@ export function SocialProof() {
             <div className="flex w-max animate-marquee items-center gap-14">
               {[...logos, ...logos].map((name, i) => (
                 <span
-                  key={i}
+                  key={`${name}-${i}`}
                   className="whitespace-nowrap text-lg font-semibold tracking-tight text-foreground/30"
                 >
                   {name}

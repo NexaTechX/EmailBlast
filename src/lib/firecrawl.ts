@@ -393,7 +393,7 @@ function extractCompanyName(url: string, companyInfo: any): string {
     const name = domain.replace(/^www\./, "").split(".")[0];
     // Convert to title case
     return name.charAt(0).toUpperCase() + name.slice(1);
-  } catch (e) {
+  } catch {
     return "Unknown Company";
   }
 }

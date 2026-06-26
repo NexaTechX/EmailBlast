@@ -37,7 +37,7 @@ export function PreferencesSettings() {
         title: "Success",
         description: "Preferences updated successfully",
       });
-    } catch (error) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Error",

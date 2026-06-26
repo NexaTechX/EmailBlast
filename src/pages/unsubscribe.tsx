@@ -55,7 +55,7 @@ export default function UnsubscribePage() {
         <Card className="p-8">
           {status === "loading" && (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
               <p className="text-muted-foreground">Processing your request...</p>
             </div>
           )}
@@ -74,7 +74,8 @@ export default function UnsubscribePage() {
                 )}
               </p>
               <p className="text-sm text-muted-foreground mb-6">
-                We're sorry to see you go! You will no longer receive emails from us.
+                We&apos;re sorry to see you go! You will no longer receive
+                emails from us.
               </p>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">

@@ -22,7 +22,9 @@ import {
   Link,
 } from "lucide-react";
 
-export function FirecrawlWebScraper({ onLeadsFound = (leads: Lead[]) => {} }) {
+export function FirecrawlWebScraper({
+  onLeadsFound = (_leads: Lead[]) => {},
+}) {
   const [url, setUrl] = useState("");
   const [scraping, setScraping] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -48,7 +50,7 @@ export function FirecrawlWebScraper({ onLeadsFound = (leads: Lead[]) => {} }) {
 
     try {
       new URL(formattedUrl);
-    } catch (e) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Invalid URL",
@@ -547,8 +549,8 @@ export function FirecrawlWebScraper({ onLeadsFound = (leads: Lead[]) => {} }) {
               </p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>
-                  Try the company's "About Us" or "Contact" pages for best
-                  results
+                  Try the company&apos;s &quot;About Us&quot; or
+                  &quot;Contact&quot; pages for best results
                 </li>
                 <li>
                   FireCrawl extracts contact info from headers, footers, and

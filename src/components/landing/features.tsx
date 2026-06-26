@@ -122,7 +122,7 @@ export function Features() {
             <p className="text-[0.95rem] leading-relaxed text-foreground/90">
               Scrape verified business leads from any website, domain, or search
               query — names, roles, and emails — enriched and deduped, then pushed
-              straight into a segment that's ready to send.
+              straight into a segment that&apos;s ready to send.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">

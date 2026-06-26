@@ -54,8 +54,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     const data = await upstream.json().catch(() => ({}));
     return res.status(upstream.status).json(data);
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Scrape proxy failed";
     console.error("scrape proxy error", err);
-    return res.status(502).json({ error: err?.message || "Scrape proxy failed" });
+    return res.status(502).json({ error: message });
   }
 }

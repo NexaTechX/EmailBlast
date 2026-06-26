@@ -51,8 +51,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (error) throw error;
     }
     return res.status(200).json({ sent: recipients.length });
-  } catch (err: any) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to send";
     console.error("send error", err);
-    return res.status(500).json({ error: err?.message || "Failed to send" });
+    return res.status(500).json({ error: message });
   }
 }

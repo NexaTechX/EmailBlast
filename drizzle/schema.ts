@@ -13,6 +13,7 @@ import {
   timestamp,
   unique,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 // Neon Auth user ids are opaque strings (Better Auth), not uuids.
@@ -214,7 +215,7 @@ export const campaignAnalytics = pgTable(
 ).enableRLS();
 
 // Campaign-owned child tables: full access only to the campaign's owner.
-const campaignChildPolicy = (campaignIdCol: any) =>
+const campaignChildPolicy = (campaignIdCol: AnyPgColumn) =>
   pgPolicy("campaign_owner_all", {
     for: "all",
     to: authenticatedRole,

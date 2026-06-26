@@ -13,7 +13,10 @@ const authUrl = import.meta.env.VITE_NEON_AUTH_URL || "";
 
 export const client = createClient({
   auth: {
-    adapter: SupabaseAuthAdapter(),
+    // `credentials: "include"` makes Neon Auth (Better Auth) send/receive its
+    // session cookie cross-origin — without it the getSession() that runs right
+    // after signIn/signUp comes back empty ("Failed to retrieve user session").
+    adapter: SupabaseAuthAdapter({ fetchOptions: { credentials: "include" } }),
     url: authUrl,
   },
   dataApi: {
