@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Groq from "groq-sdk";
 
 // Server-side AI for EmailBlast. The GROQ_API_KEY stays here — no model key ships
-// to the browser (replaces the old client-side Gemini calls + hardcoded key).
+// to the browser (replaces legacy client-side AI calls with hardcoded keys).
 //
 // Model choice per feature:
 //   - email copywriting (generate/enhance) -> openai/gpt-oss-120b (best quality)

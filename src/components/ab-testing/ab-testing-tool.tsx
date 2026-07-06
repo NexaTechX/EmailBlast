@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { getCampaigns, getSubscribers } from "@/lib/api";
-import { sendCampaign } from "@/lib/brevo";
+import { sendCampaign } from "@/lib/resend";
 import type { Campaign } from "@/types";
 import { Plus, Trash2, Play, Trophy } from "lucide-react";
 

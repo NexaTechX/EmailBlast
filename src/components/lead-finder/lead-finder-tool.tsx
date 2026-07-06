@@ -13,17 +13,16 @@ import { supabase } from "@/lib/supabase";
 import { saveLeads, getLeads, searchLeads, Lead } from "./lead-database";
 import { ensureDefaultSubscriberList } from "@/lib/api";
 import {
-  generateLeadsWithGemini,
-  enrichLeadsWithGemini,
-  generateDomainLeadsWithGemini,
-} from "@/lib/gemini-api";
+  generateLeads,
+  enrichLeads,
+  generateDomainLeads,
+} from "@/lib/groq-api";
 import {
   scrapeWebsiteForLeads,
   scrapeDomainBatch,
   searchAndScrapeLeads,
 } from "@/lib/firecrawl";
-import { URLScraper } from "./url-scraper";
-import { FirecrawlWebScraper } from "./FirecrawlWebScraper";
+import { WebScraper } from "./web-scraper";
 import {
   Search,
   Building,
@@ -152,75 +151,68 @@ export function LeadFinderTool() {
       if (regionFilter) enhancedQuery += ` in ${regionFilter}`;
       if (sizeFilter) enhancedQuery += ` at ${sizeFilter} employee companies`;
 
-      // Try to get leads from Firecrawl web scraping first
-      let firecrawlLeads = [];
+      // Try web scraping first
+      let webLeads: Lead[] = [];
       try {
         toast({
           title: "Searching the web",
           description: "Scraping websites for relevant leads...",
         });
 
-        firecrawlLeads = await searchAndScrapeLeads(enhancedQuery, {
+        webLeads = await searchAndScrapeLeads(enhancedQuery, {
           maxResults: 10,
           location: countryFilter || undefined,
           industry: industryFilter || undefined,
         });
 
-        console.log("Firecrawl leads:", firecrawlLeads.length);
-      } catch (firecrawlError) {
-        console.error("Firecrawl API error:", firecrawlError);
-        // Fall back to Gemini if Firecrawl fails
+        console.log("Web scrape leads:", webLeads.length);
+      } catch (scrapeError) {
+        console.error("Web scrape error:", scrapeError);
       }
 
-      // If Firecrawl returned results, use them
-      if (firecrawlLeads.length > 0) {
-        // Save the Firecrawl leads to the database for future searches
+      if (webLeads.length > 0) {
         try {
-          await saveLeads(firecrawlLeads as Lead[]);
-          console.log("Saved Firecrawl leads to database");
+          await saveLeads(webLeads);
+          console.log("Saved web scrape leads to database");
 
-          setSearchResults(firecrawlLeads);
+          setSearchResults(webLeads);
           toast({
             title: "Web scraping complete",
-            description: `Found ${firecrawlLeads.length} leads from web scraping matching your criteria.`,
+            description: `Found ${webLeads.length} leads from web scraping matching your criteria.`,
           });
           setSearching(false);
           return;
         } catch (saveError) {
-          console.error("Error saving Firecrawl leads to database:", saveError);
+          console.error("Error saving scraped leads to database:", saveError);
         }
       }
 
-      // If Firecrawl failed or returned no results, try Gemini API
-      let geminiLeads = [];
+      // Fall back to AI if web scraping returned no results
+      let resultLeads: Lead[] = [];
+      let aiLeads: Lead[] = [];
       try {
         toast({
           title: "Using AI generation",
           description: "Generating leads with AI...",
         });
 
-        geminiLeads = await generateLeadsWithGemini(enhancedQuery, 10);
-      } catch (geminiError) {
-        console.error("Gemini API error:", geminiError);
-        // Fall back to generated leads if Gemini fails
+        aiLeads = await generateLeads(enhancedQuery, 10);
+      } catch (aiError) {
+        console.error("AI lead generation error:", aiError);
       }
 
-      // If Gemini API returned results, use them
-      let resultLeads = [];
-      if (geminiLeads.length > 0) {
-        resultLeads = geminiLeads;
-        // Add IDs to the leads if they don't have them
+      if (aiLeads.length > 0) {
+        resultLeads = aiLeads;
         resultLeads = resultLeads.map((lead, index) => ({
           ...lead,
-          id: lead.id || `gemini-${Date.now()}-${index}`,
+          id: lead.id || `ai-${Date.now()}-${index}`,
         }));
 
-        // Save the Gemini leads to the database for future searches
         try {
           await saveLeads(resultLeads as Lead[]);
-          console.log("Saved Gemini leads to database");
+          console.log("Saved AI-generated leads to database");
         } catch (saveError) {
-          console.error("Error saving Gemini leads to database:", saveError);
+          console.error("Error saving AI leads to database:", saveError);
         }
       } else {
         toast({
@@ -316,8 +308,8 @@ export function LeadFinderTool() {
         (document.getElementById("find-all") as HTMLInputElement)?.checked ||
         false;
 
-      // Try to get real leads from Firecrawl web scraping first
-      let scrapedLeads = [];
+      // Try web scraping first
+      let scrapedLeads: Lead[] = [];
       try {
         toast({
           title: "Scraping websites",
@@ -338,13 +330,11 @@ export function LeadFinderTool() {
         // Update progress
         setBulkProgress(50);
 
-        console.log("Firecrawl scraped leads:", scrapedLeads.length);
-      } catch (firecrawlError) {
-        console.error("Firecrawl API error:", firecrawlError);
-        // Fall back to Gemini if Firecrawl fails
+        console.log("Web scraped leads:", scrapedLeads.length);
+      } catch (scrapeError) {
+        console.error("Web scrape error:", scrapeError);
       }
 
-      // If Firecrawl returned results, use them
       if (scrapedLeads.length > 0) {
         // Save the scraped leads to the database
         try {
@@ -369,7 +359,7 @@ export function LeadFinderTool() {
         }
       }
 
-      // If Firecrawl failed or returned no results, try Gemini API
+      // Fall back to AI if web scraping returned no results
       let generatedLeads = [];
       try {
         toast({
@@ -383,11 +373,11 @@ export function LeadFinderTool() {
           const domainBatch = domains.slice(i, i + batchSize);
 
           // Update progress for API call start
-          const startProgress = 50 + Math.round((i / domains.length) * 40); // Start from 50% (after Firecrawl)
+          const startProgress = 50 + Math.round((i / domains.length) * 40);
           setBulkProgress(startProgress);
 
           // Get leads for this batch of domains
-          const batchLeads = await generateDomainLeadsWithGemini(domainBatch);
+          const batchLeads = await generateDomainLeads(domainBatch);
           generatedLeads = [...generatedLeads, ...batchLeads];
 
           // Update progress after batch is processed
@@ -395,18 +385,16 @@ export function LeadFinderTool() {
             50 + Math.round(((i + domainBatch.length) / domains.length) * 40);
           setBulkProgress(endProgress);
         }
-      } catch (geminiError) {
-        console.error("Gemini API error:", geminiError);
-        // Fall back to generated leads if Gemini fails
+      } catch (aiError) {
+        console.error("AI domain lead generation error:", aiError);
       }
 
-      // If Gemini API failed or returned no results, fall back to our generated leads
       if (generatedLeads.length === 0) {
         toast({
           variant: "destructive",
           title: "No leads found",
           description:
-            "Could not generate leads for these domains. Check your Firecrawl and Groq API keys.",
+            "Could not generate leads for these domains. Try different domains or check your API configuration.",
         });
       }
 
@@ -557,15 +545,12 @@ export function LeadFinderTool() {
         selectedLeads.includes(lead.id),
       );
 
-      // Try to enrich with Gemini API first
-      let geminiEnrichedLeads = [];
+      let aiEnrichedLeads: Lead[] = [];
       try {
-        geminiEnrichedLeads = await enrichLeadsWithGemini(leadsToEnrich);
+        aiEnrichedLeads = await enrichLeads(leadsToEnrich);
 
-        // If we got results back, update the enriched results
-        if (geminiEnrichedLeads.length > 0) {
-          // Update the enriched results with the Gemini data
-          for (const enrichedLead of geminiEnrichedLeads) {
+        if (aiEnrichedLeads.length > 0) {
+          for (const enrichedLead of aiEnrichedLeads) {
             const index = enrichedResults.findIndex(
               (lead) => lead.id === enrichedLead.id,
             );
@@ -579,13 +564,11 @@ export function LeadFinderTool() {
             }
           }
         }
-      } catch (geminiError) {
-        console.error("Gemini enrichment error:", geminiError);
-        // Fall back to local enrichment if Gemini fails
+      } catch (aiError) {
+        console.error("AI enrichment error:", aiError);
       }
 
-      // If Gemini API failed or returned no results, fall back to our local enrichment
-      if (geminiEnrichedLeads.length === 0) {
+      if (aiEnrichedLeads.length === 0) {
         // Enrich the selected leads
         for (const id of selectedLeads) {
           const index = enrichedResults.findIndex((lead) => lead.id === id);
@@ -787,8 +770,7 @@ export function LeadFinderTool() {
         <TabsList className="mb-6">
           <TabsTrigger value="search">Search</TabsTrigger>
           <TabsTrigger value="bulk">Bulk Import</TabsTrigger>
-          <TabsTrigger value="scraper">URL Scraper</TabsTrigger>
-          <TabsTrigger value="firecrawl">FireCrawl</TabsTrigger>
+          <TabsTrigger value="scraper">Web Scraper</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -981,7 +963,7 @@ export function LeadFinderTool() {
         </TabsContent>
 
         <TabsContent value="scraper" className="space-y-6">
-          <URLScraper
+          <WebScraper
             onLeadsFound={(leads) => {
               if (leads && leads.length > 0) {
                 setSearchResults(leads);
@@ -999,33 +981,6 @@ export function LeadFinderTool() {
                 } catch (saveError) {
                   console.error(
                     "Error saving scraped leads to database:",
-                    saveError,
-                  );
-                }
-              }
-            }}
-          />
-        </TabsContent>
-
-        <TabsContent value="firecrawl" className="space-y-6">
-          <FirecrawlWebScraper
-            onLeadsFound={(leads) => {
-              if (leads && leads.length > 0) {
-                setSearchResults(leads);
-                setActiveTab("results");
-
-                // Save the scraped leads to the database
-                try {
-                  saveLeads(leads);
-                  console.log("Saved FireCrawl leads to database");
-
-                  toast({
-                    title: "Leads imported",
-                    description: `${leads.length} leads have been added to your results.`,
-                  });
-                } catch (saveError) {
-                  console.error(
-                    "Error saving FireCrawl leads to database:",
                     saveError,
                   );
                 }

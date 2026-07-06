@@ -20,6 +20,15 @@ import {
 import type { SubscriberList } from "@/types";
 import { ImportSubscribers } from "./import-subscribers";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
   Search,
   UserPlus,
   Download,
@@ -73,6 +82,18 @@ export function SubscriberLists() {
   const [newListName, setNewListName] = useState("");
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editListName, setEditListName] = useState("");
+  const [tagFilter, setTagFilter] = useState<string>("all");
+  const [detailSubscriber, setDetailSubscriber] = useState<Subscriber | null>(
+    null,
+  );
+  const [editForm, setEditForm] = useState({
+    first_name: "",
+    last_name: "",
+    company: "",
+    job_title: "",
+    tags: "",
+  });
+  const [savingDetail, setSavingDetail] = useState(false);
   const { toast } = useToast();
 
   const loadLists = async () => {
@@ -236,6 +257,7 @@ export function SubscriberLists() {
       const { error } = await supabase.from("subscribers").delete().eq("id", id);
       if (error) throw error;
       toast({ title: "Subscriber deleted" });
+      if (detailSubscriber?.id === id) setDetailSubscriber(null);
       loadSubscribers();
     } catch (error) {
       console.error("Error deleting subscriber:", error);
@@ -244,6 +266,56 @@ export function SubscriberLists() {
         title: "Error",
         description: "Failed to delete subscriber.",
       });
+    }
+  };
+
+  const openDetail = (s: Subscriber) => {
+    setDetailSubscriber(s);
+    setEditForm({
+      first_name: s.first_name || "",
+      last_name: s.last_name || "",
+      company: s.company || "",
+      job_title: s.job_title || "",
+      tags: (s.tags || []).join(", "),
+    });
+  };
+
+  const handleSaveDetail = async () => {
+    if (!detailSubscriber) return;
+    setSavingDetail(true);
+    try {
+      const tags = editForm.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const { error } = await supabase
+        .from("subscribers")
+        .update({
+          first_name: editForm.first_name.trim() || null,
+          last_name: editForm.last_name.trim() || null,
+          company: editForm.company.trim() || null,
+          job_title: editForm.job_title.trim() || null,
+          tags,
+          metadata: {
+            ...(detailSubscriber.metadata || {}),
+            company: editForm.company.trim() || undefined,
+            job_title: editForm.job_title.trim() || undefined,
+          },
+        })
+        .eq("id", detailSubscriber.id);
+      if (error) throw error;
+      toast({ title: "Subscriber updated" });
+      setDetailSubscriber(null);
+      loadSubscribers();
+    } catch (error) {
+      console.error("Error updating subscriber:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update subscriber.",
+      });
+    } finally {
+      setSavingDetail(false);
     }
   };
 
@@ -275,17 +347,24 @@ export function SubscriberLists() {
     URL.revokeObjectURL(url);
   };
 
-  const filteredSubscribers = searchQuery
-    ? subscribers.filter(
-        (sub) =>
-          sub.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          `${sub.first_name} ${sub.last_name}`
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()) ||
-          (sub.company &&
-            sub.company.toLowerCase().includes(searchQuery.toLowerCase())),
-      )
-    : subscribers;
+  const allTags = Array.from(
+    new Set(subscribers.flatMap((s) => s.tags || []).filter(Boolean)),
+  ).sort();
+
+  const filteredSubscribers = subscribers
+    .filter((sub) => {
+      if (tagFilter !== "all" && !(sub.tags || []).includes(tagFilter)) {
+        return false;
+      }
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        sub.email.toLowerCase().includes(q) ||
+        `${sub.first_name} ${sub.last_name}`.toLowerCase().includes(q) ||
+        (sub.company && sub.company.toLowerCase().includes(q)) ||
+        (sub.tags || []).some((t) => t.toLowerCase().includes(q))
+      );
+    });
 
   const allChecked =
     filteredSubscribers.length > 0 &&
@@ -436,6 +515,21 @@ export function SubscriberLists() {
                 className="h-10 pl-9"
               />
             </div>
+            {allTags.length > 0 && (
+              <Select value={tagFilter} onValueChange={setTagFilter}>
+                <SelectTrigger className="sm:w-40">
+                  <SelectValue placeholder="Filter by tag" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All tags</SelectItem>
+                  {allTags.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="border">
@@ -453,6 +547,7 @@ export function SubscriberLists() {
               <span className="flex-1">Email</span>
               <span className="w-40">Name</span>
               <span className="w-28">Status</span>
+              <span className="w-32 hidden lg:block">Tags</span>
               <span className="w-24">Added</span>
               <span className="w-8" />
             </div>
@@ -488,13 +583,18 @@ export function SubscriberLists() {
                 {filteredSubscribers.map((s) => (
                   <div
                     key={s.id}
-                    className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/40"
+                    className="flex cursor-pointer items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/40"
+                    onClick={() => openDetail(s)}
                   >
                     <input
                       type="checkbox"
                       className="h-3.5 w-3.5 rounded"
                       checked={selectedSubscribers.includes(s.id)}
-                      onChange={() => toggleSelectSubscriber(s.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleSelectSubscriber(s.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {s.email}
@@ -510,7 +610,23 @@ export function SubscriberLists() {
                             : "bg-emerald-500"
                         }`}
                       />
-                      {s.unsubscribed_at ? "Unsubscribed" : "Active"}
+                      {s.unsubscribed_at ? "Suppressed" : "Active"}
+                    </span>
+                    <span className="hidden w-32 gap-1 lg:flex">
+                      {(s.tags || []).slice(0, 2).map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="truncate text-[10px] font-normal"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                      {(s.tags || []).length > 2 && (
+                        <Badge variant="outline" className="text-[10px]">
+                          +{(s.tags || []).length - 2}
+                        </Badge>
+                      )}
                     </span>
                     <span className="hidden w-24 font-mono text-xs text-muted-foreground sm:block">
                       {new Date(s.subscribed_at).toLocaleDateString()}
@@ -519,8 +635,11 @@ export function SubscriberLists() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      aria-label={`Delete ${s.email}`}
-                      onClick={() => handleDeleteOne(s.id)}
+                      aria-label={`View ${s.email}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDetail(s);
+                      }}
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
@@ -558,6 +677,103 @@ export function SubscriberLists() {
           )}
         </>
       )}
+
+      <Sheet
+        open={Boolean(detailSubscriber)}
+        onOpenChange={(open) => !open && setDetailSubscriber(null)}
+      >
+        <SheetContent className="overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Subscriber</SheetTitle>
+          </SheetHeader>
+          {detailSubscriber && (
+            <div className="mt-6 space-y-4">
+              <div className="space-y-1">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Email
+                </p>
+                <p className="text-sm font-medium">{detailSubscriber.email}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Status
+                </p>
+                <p className="text-sm">
+                  {detailSubscriber.unsubscribed_at
+                    ? "Suppressed (unsubscribed or bounced)"
+                    : "Active"}
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="sub-first">First name</Label>
+                  <Input
+                    id="sub-first"
+                    value={editForm.first_name}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, first_name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="sub-last">Last name</Label>
+                  <Input
+                    id="sub-last"
+                    value={editForm.last_name}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, last_name: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sub-company">Company</Label>
+                <Input
+                  id="sub-company"
+                  value={editForm.company}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, company: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sub-title">Job title</Label>
+                <Input
+                  id="sub-title"
+                  value={editForm.job_title}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, job_title: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sub-tags">Tags (comma-separated)</Label>
+                <Input
+                  id="sub-tags"
+                  value={editForm.tags}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, tags: e.target.value })
+                  }
+                  placeholder="vip, newsletter"
+                />
+              </div>
+              <SheetFooter className="flex-col gap-2 sm:flex-col">
+                <Button onClick={handleSaveDetail} disabled={savingDetail}>
+                  {savingDetail ? "Saving…" : "Save changes"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700"
+                  onClick={() => handleDeleteOne(detailSubscriber.id)}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  Delete subscriber
+                </Button>
+              </SheetFooter>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

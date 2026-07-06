@@ -66,7 +66,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue;
       }
 
-      await sql`update campaigns set status = 'sending' where id = ${campaign.id}`;
+      // Atomically claim the campaign so overlapping cron runs can't both
+      // send it; skip if another invocation already picked it up.
+      const claimed = await sql`
+        update campaigns set status = 'sending'
+        where id = ${campaign.id} and status = 'scheduled'
+        returning id
+      `;
+      if (claimed.length === 0) {
+        continue;
+      }
 
       const subs = await sql`
         select email from subscribers

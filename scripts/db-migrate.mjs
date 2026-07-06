@@ -25,8 +25,16 @@ for (const file of files) {
   const content = readFileSync(join(migrationsDir, file), "utf8");
   const statements = content
     .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
+    .map((s) =>
+      // Strip full-line comments so a leading comment doesn't discard the
+      // SQL that follows it within the same semicolon-delimited block.
+      s
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("--"))
+        .join("\n")
+        .trim(),
+    )
+    .filter((s) => s.length > 0);
 
   console.log(`\n→ ${file} (${statements.length} statement(s))`);
   for (const statement of statements) {

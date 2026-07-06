@@ -58,7 +58,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
     });
-    const data = await upstream.json().catch(() => ({}));
+    const data = (await upstream.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+
+    if (!upstream.ok) {
+      const message =
+        (typeof data.error === "string" && data.error) ||
+        (typeof data.message === "string" && data.message) ||
+        `Scrape provider error (${upstream.status})`;
+      return res.status(upstream.status).json({ success: false, error: message, ...data });
+    }
+
     return res.status(upstream.status).json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Scrape proxy failed";

@@ -9,7 +9,7 @@ import {
   createCampaign,
   updateCampaign,
 } from "@/lib/api";
-import { sendCampaign } from "@/lib/brevo";
+import { sendCampaign } from "@/lib/resend";
 import { campaignSchema } from "@/lib/validations";
 import type { Campaign } from "@/types";
 

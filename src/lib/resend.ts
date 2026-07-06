@@ -1,8 +1,7 @@
 import type { Campaign } from "@/types";
 import { postJson } from "./api-client";
 
-// Email sending goes through Vercel /api routes (Resend server-side).
-
+/** Send a campaign via the server-side Resend proxy (/api/send). */
 export function sendCampaign(
   campaign: Campaign,
   options?: {
@@ -18,6 +17,7 @@ export function sendCampaign(
   });
 }
 
+/** Send a one-off test email via /api/send-test. */
 export function sendTestEmail(campaign: Campaign, testEmail: string) {
   return postJson("/api/send-test", {
     subject: `[TEST] ${campaign.subject}`,

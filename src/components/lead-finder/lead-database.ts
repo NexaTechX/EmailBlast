@@ -1,31 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import type { Lead } from "@/types/lead";
 
-// Interface for lead data
-export interface Lead {
-  id: string;
-  name: string;
-  title: string;
-  company: string;
-  email: string;
-  phone: string;
-  linkedin?: string;
-  website?: string;
-  industry?: string;
-  employees?: string;
-  location?: string;
-  // Enriched data
-  personalEmail?: string;
-  directPhone?: string;
-  mobile?: string;
-  education?: string;
-  previousCompanies?: string[];
-  technologies?: string[];
-  founded?: string;
-  revenue?: string;
-  companySize?: string;
-  interests?: string[];
-  confidenceScore?: number;
-}
+export type { Lead };
 
 // Save leads to the database
 export async function saveLeads(

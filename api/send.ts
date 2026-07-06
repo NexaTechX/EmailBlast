@@ -177,10 +177,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to send";
     console.error("send error", err);
-    try {
-      await sql`update campaigns set status = 'failed', updated_at = now() where id = ${campaignId}`;
-    } catch {
-      /* ignore */
+    if (updateCampaignStatus) {
+      try {
+        await sql`update campaigns set status = 'failed', updated_at = now() where id = ${campaignId}`;
+      } catch {
+        /* ignore */
+      }
     }
     return res.status(500).json({ error: message, sent: sentCount });
   }

@@ -36,10 +36,7 @@ import {
 } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { useState, useEffect } from "react";
-import {
-  generateContentWithGemini,
-  enhanceContentWithGemini,
-} from "@/lib/gemini-api";
+import { generateContent } from "@/lib/groq-api";
 
 interface RichTextEditorProps {
   content?: string;
@@ -123,7 +120,7 @@ const RichTextEditor = ({
 
     try {
       // Generate content via our server-side AI (Groq) — no key in the browser
-      const generatedContent = await generateContentWithGemini(userPrompt);
+      const generatedContent = await generateContent(userPrompt);
 
       if (editor) {
         editor.commands.setContent(generatedContent.trim());
@@ -135,7 +132,7 @@ const RichTextEditor = ({
         });
       }
     } catch (error) {
-      console.error("Error with Gemini API:", error);
+      console.error("AI content generation error:", error);
 
       // Fallback to local generation if API fails
       if (editor) {

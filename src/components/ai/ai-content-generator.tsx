@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sparkles, RefreshCw, Copy, Check, Lightbulb } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { generateContentWithGemini } from "@/lib/gemini-api";
+import { generateContent as generateAiContent } from "@/lib/groq-api";
 
 interface AIContentGeneratorProps {
   onSelectContent?: (content: string) => void;
@@ -62,7 +62,7 @@ export function AIContentGenerator({
     setLoading(true);
     try {
       // Generate content via our server-side AI (Groq) — no key in the browser
-      const generatedContent = await generateContentWithGemini(prompt);
+      const generatedContent = await generateAiContent(prompt);
 
       // Generate a few variations with slight modifications
       const variations = [

@@ -13,7 +13,7 @@ import {
   DialogDescription,
 } from "../ui/dialog";
 import { Label } from "../ui/label";
-import { sendTestEmail } from "@/lib/brevo";
+import { sendTestEmail } from "@/lib/resend";
 import { useToast } from "../ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { analyzeCompliance } from "@/lib/compliance";

@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Monitor, Smartphone, Download } from "lucide-react";
 import { useToast } from "../ui/use-toast";
-import { sendTestEmail } from "@/lib/brevo";
+import { sendTestEmail } from "@/lib/resend";
 
 interface CampaignPreviewProps {
   content?: string;

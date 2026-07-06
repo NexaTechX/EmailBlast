@@ -153,8 +153,7 @@ Two keys were committed to git history; deleting them from source is not enough:
   beta; the client is isolated in `src/lib/neon.ts` for easy swapping. Fallback:
   `@neondatabase/postgrest-js` + `@neondatabase/serverless`.
 - **Naming.** `src/lib/supabase.ts` is now a thin shim re-exporting the Neon
-  `client`; `brevo.ts` calls Resend; `gemini-api.ts` calls Groq. Names kept for
-  import stability — safe to rename later.
+  `client`; `resend.ts` and `groq-api.ts` call the server `/api` routes.
 - **`/api/scrape`** is allow-listed to Firecrawl `scrape`/`map`/`search` but is
   unauthenticated; consider verifying the Neon Auth JWT to prevent credit abuse.
 - **Bundle size.** The main chunk is ~2 MB (pre-existing); consider code-splitting.
@@ -168,5 +167,5 @@ Two keys were committed to git history; deleting them from source is not enough:
 - `src/lib/neon.ts` — the Neon client (auth + data); `src/lib/supabase.ts` re-exports it
 - `src/lib/auth.tsx` — auth provider on Neon Auth (profile upsert on first session)
 - `api/` — Vercel functions: `send`, `send-test`, `ai`, `scrape`, `unsubscribe`, `track/open`, `webhooks/resend`, `_lib/{db,tracking}`
-- `src/lib/{brevo,gemini-api,firecrawl,firecrawl-js,firecrawl-client}.ts` — client wrappers that POST to `/api`
+- `src/lib/{resend,groq-api,firecrawl,scrape-api}.ts` — client wrappers that POST to `/api`
 - `vercel.json` — SPA routing

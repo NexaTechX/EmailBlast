@@ -91,7 +91,7 @@ EmailBlast/
 ├── drizzle/             # Schema + migrations
 ├── src/
 │   ├── components/      # UI components
-│   ├── lib/             # Client helpers (auth, api, brevo→Resend proxy)
+│   ├── lib/             # Client helpers (auth, api, resend, groq-api, scrape)
 │   └── pages/           # Route pages
 └── env.template         # Environment variable reference
 ```
