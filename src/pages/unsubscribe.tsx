@@ -35,7 +35,8 @@ export default function UnsubscribePage() {
       const res = await fetch(`/api/unsubscribe?${params.toString()}`);
       if (!res.ok) throw new Error(`Unsubscribe failed (${res.status})`);
 
-      setStatus("success");
+      const data = await res.json();
+      setStatus(data.status === "already" ? "already" : "success");
     } catch (error) {
       console.error("Error unsubscribing:", error);
       setStatus("error");

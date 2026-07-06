@@ -2,18 +2,22 @@ import React, { useState } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Monitor, Smartphone } from "lucide-react";
+import { Monitor, Smartphone, Download } from "lucide-react";
 import { useToast } from "../ui/use-toast";
 import { sendTestEmail } from "@/lib/brevo";
 
 interface CampaignPreviewProps {
   content?: string;
   subject?: string;
+  senderName?: string;
+  senderEmail?: string;
 }
 
 const CampaignPreview = ({
   content = "<p>This is a preview of your email content...</p>",
   subject = "Sample Email Campaign",
+  senderName = "Sender",
+  senderEmail = "",
 }: CampaignPreviewProps) => {
   const [activeView, setActiveView] = useState("desktop");
   const [testEmail, setTestEmail] = useState("");
@@ -30,6 +34,15 @@ const CampaignPreview = ({
       return;
     }
 
+    if (!senderEmail) {
+      toast({
+        title: "Error",
+        description: "Set a sender email in campaign details first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSending(true);
     try {
       await sendTestEmail(
@@ -38,8 +51,8 @@ const CampaignPreview = ({
           title: "Test Email",
           subject: subject,
           content: content,
-          sender_name: "Test Sender",
-          sender_email: "test@example.com",
+          sender_name: senderName,
+          sender_email: senderEmail,
           status: "draft",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -62,6 +75,19 @@ const CampaignPreview = ({
     } finally {
       setSending(false);
     }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob(
+      [`Subject: ${subject}\n\n`, content],
+      { type: "text/html" },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${subject.replace(/[^a-z0-9]/gi, "_") || "preview"}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -91,6 +117,9 @@ const CampaignPreview = ({
             <div className="max-w-[800px] mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
               <div className="p-4 border-b">
                 <div className="text-sm text-gray-600">Subject: {subject}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  From: {senderName} &lt;{senderEmail || "sender@example.com"}&gt;
+                </div>
               </div>
               <div
                 className="p-6"
@@ -126,7 +155,10 @@ const CampaignPreview = ({
         <Button variant="outline" onClick={handleSendTest} disabled={sending}>
           {sending ? "Sending..." : "Send Test Email"}
         </Button>
-        <Button variant="outline">Download Preview</Button>
+        <Button variant="outline" onClick={handleDownload}>
+          <Download className="h-4 w-4 mr-2" />
+          Download
+        </Button>
       </div>
     </Card>
   );

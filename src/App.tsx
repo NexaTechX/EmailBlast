@@ -17,22 +17,20 @@ import { AppLayout } from "./components/layout/app-layout";
 import { DashboardOverview } from "./components/dashboard/dashboard-overview";
 import { CampaignList } from "./components/campaign/campaign-list";
 import { SubscriberLists } from "./components/subscriber/subscriber-list";
+import { CampaignAnalyticsRoute } from "./pages/campaign-analytics";
 import { AdvancedAnalyticsDashboard } from "./components/analytics/advanced-analytics-dashboard";
 import { SettingsLayout } from "./components/settings/settings-layout";
 import { ProfileSettings } from "./components/settings/profile-settings";
 import { SubscriptionSettings } from "./components/settings/subscription-settings";
 import { PreferencesSettings } from "./components/settings/preferences-settings";
+import { SendingSettings } from "./components/settings/sending-settings";
 import { SecuritySettings } from "./components/security/security-settings";
-import { TeamManagement } from "./components/collaboration/team-management";
 import { DocumentationCenter } from "./components/documentation/documentation-center";
-import { MobileAppPreview } from "./components/mobile/mobile-app-preview";
-import { SEOOptimization } from "./components/seo/seo-optimization";
-import { ComplianceChecker } from "./components/compliance/compliance-checker";
 import { ABTestingTool } from "./components/ab-testing/ab-testing-tool";
 import { LeadFinderTool } from "./components/lead-finder/lead-finder-tool";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, isEmailVerified } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return <div>Loading...</div>;
@@ -42,14 +40,10 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" />;
   }
 
-  // Email verification is handled by Supabase's built-in flow
-  // No need to check isEmailVerified anymore
-
   return <>{children}</>;
 }
 
 function App() {
-  // useRoutes must be called unconditionally (Rules of Hooks); only render it under Tempo.
   const tempoRoutes = useRoutes(routes);
 
   return (
@@ -78,14 +72,7 @@ function App() {
                       <Route path="/campaigns/:id" element={<Home />} />
                       <Route
                         path="/campaigns/:id/analytics"
-                        element={
-                          <AdvancedAnalyticsDashboard
-                            campaignId={
-                              window.location.pathname.split("/")[3] ||
-                              "overview"
-                            }
-                          />
-                        }
+                        element={<CampaignAnalyticsRoute />}
                       />
                       <Route
                         path="/subscribers"
@@ -97,8 +84,11 @@ function App() {
                           <AdvancedAnalyticsDashboard campaignId="overview" />
                         }
                       />
+                      <Route path="/ab-testing" element={<ABTestingTool />} />
+                      <Route path="/lead-finder" element={<LeadFinderTool />} />
                       <Route path="/settings" element={<SettingsLayout />}>
                         <Route index element={<ProfileSettings />} />
+                        <Route path="sending" element={<SendingSettings />} />
                         <Route
                           path="subscription"
                           element={<SubscriptionSettings />}
@@ -108,20 +98,11 @@ function App() {
                           element={<PreferencesSettings />}
                         />
                         <Route path="security" element={<SecuritySettings />} />
-                        <Route path="team" element={<TeamManagement />} />
                       </Route>
                       <Route
                         path="/documentation"
                         element={<DocumentationCenter />}
                       />
-                      <Route path="/mobile" element={<MobileAppPreview />} />
-                      <Route path="/seo" element={<SEOOptimization />} />
-                      <Route
-                        path="/compliance"
-                        element={<ComplianceChecker />}
-                      />
-                      <Route path="/ab-testing" element={<ABTestingTool />} />
-                      <Route path="/lead-finder" element={<LeadFinderTool />} />
                     </Routes>
                   </AppLayout>
                 </PrivateRoute>

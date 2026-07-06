@@ -27,18 +27,11 @@ export interface Lead {
   confidenceScore?: number;
 }
 
+import { postJson } from "./api-client";
+
 /** POST a request to the server-side AI endpoint (/api/ai) and return its JSON. */
 async function callAi<T>(body: Record<string, unknown>): Promise<T> {
-  const res = await fetch("/api/ai", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`AI request failed (${res.status}): ${detail}`);
-  }
-  return res.json() as Promise<T>;
+  return postJson("/api/ai", body) as Promise<T>;
 }
 
 /** Generate HTML email content from a prompt (via the server-side AI). */

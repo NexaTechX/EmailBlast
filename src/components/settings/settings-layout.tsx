@@ -5,18 +5,17 @@ import {
   CreditCard,
   SlidersHorizontal,
   Shield,
-  Users,
+  Mail,
 } from "lucide-react";
 
 const settingsNav = [
   { title: "Profile", href: "/app/settings", icon: User },
+  { title: "Sending", href: "/app/settings/sending", icon: Mail },
   { title: "Subscription", href: "/app/settings/subscription", icon: CreditCard },
   { title: "Preferences", href: "/app/settings/preferences", icon: SlidersHorizontal },
   { title: "Security", href: "/app/settings/security", icon: Shield },
-  { title: "Team", href: "/app/settings/team", icon: Users },
 ];
 
-// Settings shell: side navigation plus the active sub-page outlet.
 export function SettingsLayout() {
   const location = useLocation();
 

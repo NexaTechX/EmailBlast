@@ -3,6 +3,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -20,12 +27,19 @@ import {
   UserPlus,
 } from "lucide-react";
 
-export function ImportSubscribers() {
+export function ImportSubscribers({
+  listId,
+  onComplete,
+}: {
+  listId: string;
+  onComplete?: () => void;
+}) {
   const [activeTab, setActiveTab] = useState("paste");
   const [csvData, setCsvData] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [previewRows, setPreviewRows] = useState<Record<string, string>[]>([]);
   const [importResults, setImportResults] = useState<{
     total: number;
     success: number;
@@ -34,9 +48,30 @@ export function ImportSubscribers() {
   }>({ total: 0, success: 0, failed: 0, errors: [] });
   const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selected = e.target.files[0];
+      setFile(selected);
+      const text = await selected.text();
+      try {
+        const parsed = (await parseCSV(text)) as Record<string, string>[];
+        setPreviewRows(parsed.slice(0, 5));
+      } catch {
+        setPreviewRows([]);
+      }
+    }
+  };
+
+  const handlePastePreview = async () => {
+    if (!csvData.trim()) {
+      setPreviewRows([]);
+      return;
+    }
+    try {
+      const parsed = (await parseCSV(csvData)) as Record<string, string>[];
+      setPreviewRows(parsed.slice(0, 5));
+    } catch {
+      setPreviewRows([]);
     }
   };
 
@@ -52,6 +87,15 @@ export function ImportSubscribers() {
   };
 
   const importSubscribers = async () => {
+    if (!listId) {
+      toast({
+        variant: "destructive",
+        title: "No list selected",
+        description: "Select or create a subscriber list first.",
+      });
+      return;
+    }
+
     setImporting(true);
     setProgress(0);
     setImportResults({ total: 0, success: 0, failed: 0, errors: [] });
@@ -86,6 +130,7 @@ export function ImportSubscribers() {
         const batch = subscribers.slice(i, i + batchSize);
         const formattedBatch = batch.map((sub) => ({
           email: sub.email?.toLowerCase().trim(),
+          list_id: listId,
           first_name: sub.first_name || sub.firstName || sub.firstname || "",
           last_name: sub.last_name || sub.lastName || sub.lastname || "",
           tags: sub.tags
@@ -142,6 +187,9 @@ export function ImportSubscribers() {
         title: "Import complete",
         description: `Successfully imported ${success} subscribers. ${failed} failed.`,
       });
+      if (failed === 0) {
+        onComplete?.();
+      }
     } catch (error: any) {
       console.error("Import error:", error);
       toast({
@@ -176,6 +224,7 @@ export function ImportSubscribers() {
         email: email.toLowerCase().trim(),
         first_name: firstName,
         last_name: lastName,
+        list_id: listId,
       });
 
       if (error) {
@@ -238,6 +287,35 @@ export function ImportSubscribers() {
               recognized columns: first_name, last_name, phone, company,
               job_title, tags.
             </p>
+            <Button type="button" variant="outline" size="sm" onClick={handlePastePreview}>
+              Preview first 5 rows
+            </Button>
+            {previewRows.length > 0 && (
+              <div className="overflow-x-auto rounded border text-xs">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      {Object.keys(previewRows[0] || {}).map((k) => (
+                        <th key={k} className="px-2 py-1 text-left font-medium">
+                          {k}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewRows.map((row, i) => (
+                      <tr key={i} className="border-b">
+                        {Object.values(row).map((v, j) => (
+                          <td key={j} className="px-2 py-1 truncate max-w-[120px]">
+                            {String(v)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {importing && (

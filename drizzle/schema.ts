@@ -39,6 +39,12 @@ export const profiles = pgTable(
     fullName: text("full_name"),
     companyName: text("company_name"),
     website: text("website"),
+    mailingAddress: text("mailing_address"),
+    defaultSenderName: text("default_sender_name"),
+    defaultSenderEmail: text("default_sender_email"),
+    onboardingCompletedAt: timestamp("onboarding_completed_at", {
+      withTimezone: true,
+    }),
     createdAt,
     updatedAt,
   },
@@ -209,7 +215,7 @@ export const campaignAnalytics = pgTable(
     }),
     check(
       "campaign_analytics_event_type_check",
-      sql`${t.eventType} in ('open','click','bounce','unsubscribe','conversion')`,
+      sql`${t.eventType} in ('open','click','bounce','unsubscribe','conversion','sent')`,
     ),
   ],
 ).enableRLS();

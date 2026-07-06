@@ -28,6 +28,37 @@ export async function createSubscriberList(name: string, description?: string) {
   return data as SubscriberList;
 }
 
+export async function updateSubscriberList(
+  id: string,
+  updates: { name?: string; description?: string },
+) {
+  const { data, error } = await supabase
+    .from("subscriber_lists")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as SubscriberList;
+}
+
+export async function deleteSubscriberList(id: string) {
+  const { error } = await supabase
+    .from("subscriber_lists")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+/** Creates "My Subscribers" if the user has no lists yet. */
+export async function ensureDefaultSubscriberList(): Promise<SubscriberList | null> {
+  const lists = await getSubscriberLists();
+  if (lists.length > 0) return lists[0];
+  return createSubscriberList("My Subscribers", "Default subscriber list");
+}
+
 // Subscribers
 export async function getSubscribers(listId: string) {
   const { data, error } = await supabase
@@ -105,8 +136,8 @@ export async function deleteCampaign(id: string) {
   if (error) throw error;
 }
 
-// Analytics
-export async function getCampaignAnalytics(campaignId: string) {
+// Analytics — use analytics-utils for reads; server writes via /api routes.
+export async function getCampaignAnalyticsFromApi(campaignId: string) {
   const { data, error } = await supabase
     .from("campaign_analytics")
     .select("*")
@@ -115,15 +146,4 @@ export async function getCampaignAnalytics(campaignId: string) {
 
   if (error) throw error;
   return data as CampaignAnalytics[];
-}
-
-export async function trackCampaignEvent(event: Partial<CampaignAnalytics>) {
-  const { data, error } = await supabase
-    .from("campaign_analytics")
-    .insert([event])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as CampaignAnalytics;
 }

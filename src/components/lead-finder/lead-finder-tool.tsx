@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { saveLeads, getLeads, searchLeads, Lead } from "./lead-database";
+import { ensureDefaultSubscriberList } from "@/lib/api";
 import {
   generateLeadsWithGemini,
   enrichLeadsWithGemini,
@@ -48,232 +49,11 @@ export function LeadFinderTool() {
   const [bulkProgress, setBulkProgress] = useState(0);
   const { toast } = useToast();
 
-  // AI-generated leads based on industry and role
-  const generateLeads = (industry: string, role: string, location: string) => {
-    const industries = {
-      Technology: [
-        { company: "TechNova Solutions", domain: "technovasolutions.com" },
-        { company: "ByteWave Systems", domain: "bytewavesystems.com" },
-        { company: "Quantum Digital", domain: "quantumdigital.io" },
-        { company: "Nexus Technologies", domain: "nexustech.com" },
-        { company: "Apex Software", domain: "apexsoftware.dev" },
-      ],
-      Healthcare: [
-        { company: "MediCare Innovations", domain: "medicareinnovations.com" },
-        { company: "HealthPulse", domain: "healthpulse.io" },
-        { company: "Vitality Systems", domain: "vitalitysystems.health" },
-        { company: "CareConnect", domain: "careconnect.med" },
-        { company: "MedTech Solutions", domain: "medtechsolutions.com" },
-      ],
-      Finance: [
-        { company: "Capital Ventures", domain: "capitalventures.com" },
-        { company: "Wealth Horizon", domain: "wealthhorizon.finance" },
-        { company: "Prosperity Partners", domain: "prosperitypartners.com" },
-        { company: "Asset Alliance", domain: "assetalliance.invest" },
-        { company: "Financial Frontier", domain: "financialfrontier.com" },
-      ],
-      Retail: [
-        { company: "Urban Essentials", domain: "urbanessentials.com" },
-        { company: "Retail Revolution", domain: "retailrevolution.store" },
-        { company: "Market Masters", domain: "marketmasters.shop" },
-        { company: "Consumer Connect", domain: "consumerconnect.retail" },
-        { company: "Shop Sphere", domain: "shopsphere.com" },
-      ],
-    };
-
-    const roles = {
-      CEO: [
-        "Chief Executive Officer",
-        "Founder",
-        "President",
-        "Managing Director",
-      ],
-      CTO: [
-        "Chief Technology Officer",
-        "VP of Engineering",
-        "Technical Director",
-        "Head of Technology",
-      ],
-      Marketing: [
-        "Marketing Director",
-        "CMO",
-        "Marketing Manager",
-        "Growth Lead",
-        "Brand Manager",
-      ],
-      Sales: [
-        "Sales Director",
-        "VP of Sales",
-        "Business Development Manager",
-        "Account Executive",
-        "Sales Manager",
-      ],
-    };
-
-    const locations = {
-      us: [
-        "New York, NY",
-        "San Francisco, CA",
-        "Austin, TX",
-        "Chicago, IL",
-        "Seattle, WA",
-      ],
-      ca: [
-        "Toronto, ON",
-        "Vancouver, BC",
-        "Montreal, QC",
-        "Calgary, AB",
-        "Ottawa, ON",
-      ],
-      uk: [
-        "London, UK",
-        "Manchester, UK",
-        "Birmingham, UK",
-        "Edinburgh, UK",
-        "Glasgow, UK",
-      ],
-      au: [
-        "Sydney, NSW",
-        "Melbourne, VIC",
-        "Brisbane, QLD",
-        "Perth, WA",
-        "Adelaide, SA",
-      ],
-    };
-
-    // Generate random first and last names
-    const firstNames = [
-      "James",
-      "Emma",
-      "Michael",
-      "Olivia",
-      "William",
-      "Sophia",
-      "Alexander",
-      "Charlotte",
-      "Daniel",
-      "Ava",
-      "David",
-      "Mia",
-      "Joseph",
-      "Amelia",
-      "Matthew",
-      "Harper",
-      "Andrew",
-      "Evelyn",
-      "Joshua",
-      "Abigail",
-    ];
-    const lastNames = [
-      "Smith",
-      "Johnson",
-      "Williams",
-      "Brown",
-      "Jones",
-      "Garcia",
-      "Miller",
-      "Davis",
-      "Rodriguez",
-      "Martinez",
-      "Hernandez",
-      "Lopez",
-      "Gonzalez",
-      "Wilson",
-      "Anderson",
-      "Thomas",
-      "Taylor",
-      "Moore",
-      "Jackson",
-      "Martin",
-    ];
-
-    // Select industry companies or default to Technology
-    const selectedIndustry =
-      industries[industry as keyof typeof industries] || industries.Technology;
-    // Select roles or default to Marketing
-    const selectedRoles = roles[role as keyof typeof roles] || roles.Marketing;
-    // Select locations or default to US
-    const selectedLocations =
-      locations[location as keyof typeof locations] || locations.us;
-
-    // Generate 5-10 leads
-    const numLeads = Math.floor(Math.random() * 6) + 5;
-    const leads = [];
-
-    for (let i = 0; i < numLeads; i++) {
-      const companyInfo =
-        selectedIndustry[Math.floor(Math.random() * selectedIndustry.length)];
-      const firstName =
-        firstNames[Math.floor(Math.random() * firstNames.length)];
-      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      const title =
-        selectedRoles[Math.floor(Math.random() * selectedRoles.length)];
-      const location =
-        selectedLocations[Math.floor(Math.random() * selectedLocations.length)];
-      const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${companyInfo.domain}`;
-
-      leads.push({
-        id: `${i + 1}-${Date.now()}`,
-        name: `${firstName} ${lastName}`,
-        title: title,
-        company: companyInfo.company,
-        email: email,
-        phone: `+1 (${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-        linkedin: `linkedin.com/in/${firstName.toLowerCase()}${lastName.toLowerCase()}${Math.floor(Math.random() * 100)}`,
-        website: `https://www.${companyInfo.domain}`,
-        industry: industry || "Technology",
-        employees: [`1-10`, `11-50`, `51-200`, `201-500`, `501+`][
-          Math.floor(Math.random() * 5)
-        ],
-        location: location,
-      });
-    }
-
-    return leads;
-  };
-
-  // Default mock leads for initial state
-  const mockLeads = [
-    {
-      id: "1",
-      name: "John Smith",
-      title: "Marketing Director",
-      company: "Acme Inc",
-      email: "john.smith@acme.com",
-      phone: "+1 (555) 123-4567",
-      linkedin: "linkedin.com/in/johnsmith",
-      website: "acme.com",
-      industry: "Technology",
-      employees: "50-100",
-      location: "New York, NY",
-    },
-    {
-      id: "2",
-      name: "Sarah Johnson",
-      title: "CEO",
-      company: "Bright Solutions",
-      email: "sarah@brightsolutions.io",
-      phone: "+1 (555) 987-6543",
-      linkedin: "linkedin.com/in/sarahjohnson",
-      website: "brightsolutions.io",
-      industry: "Software",
-      employees: "10-50",
-      location: "San Francisco, CA",
-    },
-    {
-      id: "3",
-      name: "Michael Chen",
-      title: "Sales Manager",
-      company: "Global Tech",
-      email: "mchen@globaltech.com",
-      phone: "+1 (555) 456-7890",
-      linkedin: "linkedin.com/in/michaelchen",
-      website: "globaltech.com",
-      industry: "Technology",
-      employees: "100-500",
-      location: "Austin, TX",
-    },
-  ];
+  useEffect(() => {
+    getLeads().then(({ leads }) => {
+      if (leads.length > 0) setSearchResults(leads);
+    });
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery) return;
@@ -443,42 +223,13 @@ export function LeadFinderTool() {
           console.error("Error saving Gemini leads to database:", saveError);
         }
       } else {
-        // Generate AI leads based on search criteria using our local function
-        const aiGeneratedLeads = generateLeads(
-          industryFilter || searchQuery.includes("tech")
-            ? "Technology"
-            : searchQuery.includes("health")
-              ? "Healthcare"
-              : searchQuery.includes("finance")
-                ? "Finance"
-                : searchQuery.includes("retail")
-                  ? "Retail"
-                  : "Technology",
-          jobTitleFilter || searchQuery.includes("ceo")
-            ? "CEO"
-            : searchQuery.includes("cto")
-              ? "CTO"
-              : searchQuery.includes("market")
-                ? "Marketing"
-                : searchQuery.includes("sales")
-                  ? "Sales"
-                  : "Marketing",
-          countryFilter ||
-            searchQuery.includes("US") ||
-            searchQuery.includes("United States")
-            ? "us"
-            : searchQuery.includes("Canada")
-              ? "ca"
-              : searchQuery.includes("UK") ||
-                  searchQuery.includes("United Kingdom")
-                ? "uk"
-                : searchQuery.includes("Australia")
-                  ? "au"
-                  : "us",
-        );
-
-        // Combine with mock leads for more variety
-        resultLeads = [...aiGeneratedLeads, ...mockLeads];
+        toast({
+          variant: "destructive",
+          title: "No leads found",
+          description:
+            "Could not find leads via web scraping or AI. Try a different query or check your API keys.",
+        });
+        resultLeads = [];
       }
 
       // Filter leads based on search query and filters
@@ -652,126 +403,11 @@ export function LeadFinderTool() {
       // If Gemini API failed or returned no results, fall back to our generated leads
       if (generatedLeads.length === 0) {
         toast({
-          title: "Using fallback generation",
-          description: "Creating leads based on domain patterns...",
+          variant: "destructive",
+          title: "No leads found",
+          description:
+            "Could not generate leads for these domains. Check your Firecrawl and Groq API keys.",
         });
-
-        // Process domains one by one with progress updates
-        for (let i = 0; i < domains.length; i++) {
-          const domain = domains[i];
-
-          // Generate more leads if findAll is checked
-          const numLeads = findAll
-            ? Math.floor(Math.random() * 5) + 3
-            : Math.floor(Math.random() * 3) + 1;
-
-          // Generate company name from domain
-          const companyName = domain
-            .split(".")[0]
-            .split("-")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-
-          // Determine industry based on domain keywords
-          let industry = "Technology";
-          if (
-            domain.includes("health") ||
-            domain.includes("med") ||
-            domain.includes("care")
-          ) {
-            industry = "Healthcare";
-          } else if (
-            domain.includes("finance") ||
-            domain.includes("capital") ||
-            domain.includes("invest")
-          ) {
-            industry = "Finance";
-          } else if (
-            domain.includes("shop") ||
-            domain.includes("store") ||
-            domain.includes("retail")
-          ) {
-            industry = "Retail";
-          }
-
-          // Generate different roles for the company
-          const roles = findAll
-            ? [
-                "CEO",
-                "CTO",
-                "Marketing Director",
-                "Sales Manager",
-                "Product Manager",
-                "HR Director",
-              ]
-            : ["Marketing Director", "Sales Manager"];
-
-          // Use only the roles we need
-          const selectedRoles = roles.slice(0, numLeads);
-
-          // Generate leads for each role
-          for (let j = 0; j < numLeads; j++) {
-            // Generate random first and last name
-            const firstNames = [
-              "James",
-              "Emma",
-              "Michael",
-              "Olivia",
-              "William",
-              "Sophia",
-              "Alexander",
-              "Charlotte",
-              "Daniel",
-              "Ava",
-            ];
-            const lastNames = [
-              "Smith",
-              "Johnson",
-              "Williams",
-              "Brown",
-              "Jones",
-              "Garcia",
-              "Miller",
-              "Davis",
-              "Rodriguez",
-              "Martinez",
-            ];
-
-            const firstName =
-              firstNames[Math.floor(Math.random() * firstNames.length)];
-            const lastName =
-              lastNames[Math.floor(Math.random() * lastNames.length)];
-            const role = selectedRoles[j % selectedRoles.length];
-
-            const newLead = {
-              id: `${domain}-${j}`,
-              name: `${firstName} ${lastName}`,
-              title: role,
-              company: companyName,
-              email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${domain}`,
-              phone: `+1 (${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-              linkedin: `linkedin.com/in/${firstName.toLowerCase()}${lastName.toLowerCase()}${Math.floor(Math.random() * 100)}`,
-              website: `https://www.${domain}`,
-              industry: industry,
-              employees: [`1-10`, `11-50`, `51-200`, `201-500`, `501+`][
-                Math.floor(Math.random() * 5)
-              ],
-              location: [
-                "New York, NY",
-                "San Francisco, CA",
-                "Austin, TX",
-                "Chicago, IL",
-                "Seattle, WA",
-              ][Math.floor(Math.random() * 5)],
-            };
-
-            generatedLeads.push(newLead);
-          }
-
-          // Update progress
-          const progress = 90 + Math.round(((i + 1) / domains.length) * 10); // From 90% to 100%
-          setBulkProgress(progress);
-        }
       }
 
       // Add IDs to the leads if they don't have them
@@ -820,10 +456,15 @@ export function LeadFinderTool() {
   const handleAddToList = async () => {
     if (selectedLeads.length === 0) return;
 
+    const confirmed = confirm(
+      "These leads are AI-generated or scraped samples and may not be verified contacts. Only add them if you have permission to email them. Continue?",
+    );
+    if (!confirmed) return;
+
     try {
-      // Add selected leads to subscribers table. `user_id` is omitted so the
-      // DB default `auth.user_id()` fills it and RLS passes. company/title/phone
-      // are not columns on `subscribers`, so they go into metadata.
+      const defaultList = await ensureDefaultSubscriberList();
+      if (!defaultList) throw new Error("No subscriber list available");
+
       const leadsToAdd = selectedLeads
         .map((id) => {
           const lead = searchResults.find((l) => l.id === id);
@@ -831,6 +472,7 @@ export function LeadFinderTool() {
 
           return {
             email: lead.email?.toLowerCase(),
+            list_id: defaultList.id,
             first_name: lead.name?.split(" ")[0] || "",
             last_name: lead.name?.split(" ").slice(1).join(" ") || "",
             tags: ["lead-finder"],
@@ -1136,11 +778,8 @@ export function LeadFinderTool() {
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold">Lead Finder</h3>
-        <Badge
-          variant="outline"
-          className="bg-blue-50 text-blue-700 border-blue-200"
-        >
-          AI-Powered
+        <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+          Beta — experimental
         </Badge>
       </div>
 

@@ -2,74 +2,47 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { Crown, Check } from "lucide-react";
-import { createCheckoutSession } from "@/lib/creem";
+import { Crown, Check, Clock } from "lucide-react";
 
 const plans = [
   {
     name: "Free",
     price: "$0",
-    productId: "prod_free", // Replace with your actual Creem product ID
     features: [
       "Up to 500 subscribers",
       "1,000 emails per month",
       "Basic templates",
       "Email support",
     ],
+    current: true,
   },
   {
     name: "Pro",
     price: "$29",
-    productId: "prod_pro", // Replace with your actual Creem product ID
     features: [
       "Up to 5,000 subscribers",
       "20,000 emails per month",
       "Premium templates",
       "Priority support",
       "Advanced analytics",
-      "Custom branding",
     ],
+    comingSoon: true,
   },
   {
     name: "Enterprise",
-    price: "$99",
-    productId: "prod_enterprise", // Replace with your actual Creem product ID
+    price: "Custom",
     features: [
       "Unlimited subscribers",
-      "Unlimited emails",
-      "Custom templates",
-      "24/7 phone support",
+      "Dedicated support",
       "Advanced automation",
-      "Dedicated account manager",
+      "Custom integrations",
     ],
+    comingSoon: true,
   },
 ];
 
 export function SubscriptionSettings() {
   const { toast } = useToast();
-  const [currentPlan, setCurrentPlan] = useState("Free");
-  const [loading, setLoading] = useState(false);
-
-  const handleUpgrade = async (planName: string) => {
-    setLoading(true);
-    try {
-      const plan = plans.find((p) => p.name === planName);
-      if (!plan) throw new Error("Invalid plan");
-
-      await createCheckoutSession({
-        productId: plan.productId,
-      });
-    } catch (error) {
-      console.error("Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to upgrade plan",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -77,9 +50,24 @@ export function SubscriptionSettings() {
         <h2 className="text-3xl font-bold tracking-tight">Subscription</h2>
         <div className="flex items-center gap-2">
           <Crown className="h-5 w-5 text-primary" />
-          <span className="font-semibold">Current Plan: {currentPlan}</span>
+          <span className="font-semibold">Current Plan: Free</span>
         </div>
       </div>
+
+      <Card className="p-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900">
+        <div className="flex items-start gap-3">
+          <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-900 dark:text-amber-100">
+              Paid plans coming soon
+            </p>
+            <p className="text-sm text-amber-800/80 dark:text-amber-200/80 mt-1">
+              Billing integration is in progress. All features are currently
+              available on the Free plan while we finish payment setup.
+            </p>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => (
@@ -89,9 +77,11 @@ export function SubscriptionSettings() {
                 <h3 className="text-2xl font-bold">{plan.name}</h3>
                 <p className="text-3xl font-bold mt-2">
                   {plan.price}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    /month
-                  </span>
+                  {plan.price !== "Custom" && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      /month
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -106,13 +96,20 @@ export function SubscriptionSettings() {
 
               <Button
                 className="mt-6"
-                variant={plan.name === currentPlan ? "outline" : "default"}
-                disabled={plan.name === currentPlan || loading}
-                onClick={() => handleUpgrade(plan.name)}
+                variant={plan.current ? "outline" : "secondary"}
+                disabled
+                onClick={() =>
+                  toast({
+                    title: "Coming soon",
+                    description: "Paid plans will be available in a future update.",
+                  })
+                }
               >
-                {plan.name === currentPlan
+                {plan.current
                   ? "Current Plan"
-                  : `Upgrade to ${plan.name}`}
+                  : plan.comingSoon
+                    ? "Coming soon"
+                    : `Upgrade to ${plan.name}`}
               </Button>
             </div>
           </Card>

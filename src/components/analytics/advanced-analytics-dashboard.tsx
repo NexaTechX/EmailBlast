@@ -1,39 +1,44 @@
 import { useState, useEffect } from "react";
-import { Activity } from "lucide-react";
+import { Activity, Download } from "lucide-react";
 import { getCampaignAnalytics } from "@/components/analytics/analytics-utils";
+import { getCampaigns } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
-import type { CampaignAnalytics } from "@/types";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { CampaignAnalytics, Campaign } from "@/types";
 
 interface AnalyticsSummary {
   opens: number;
   clicks: number;
   unsubscribes: number;
   bounces: number;
+  sent: number;
   totalEvents: number;
-  revenue: number;
-  conversions: number;
 }
 
-// Maps an analytics event type to its status-dot colour class.
 const eventDot = (type: CampaignAnalytics["event_type"]) => {
   switch (type) {
     case "open":
       return "bg-sky-500";
     case "click":
       return "bg-emerald-500";
-    case "conversion":
-      return "bg-violet-500";
     case "unsubscribe":
       return "bg-amber-500";
     case "bounce":
       return "bg-red-500";
+    case "sent":
+      return "bg-violet-500";
     default:
       return "bg-muted-foreground/40";
   }
 };
 
-// Campaign analytics view: loads events and renders summary tiles + a stream.
 export function AdvancedAnalyticsDashboard({
   campaignId,
 }: {
@@ -41,28 +46,34 @@ export function AdvancedAnalyticsDashboard({
 }) {
   const { toast } = useToast();
   const [analytics, setAnalytics] = useState<CampaignAnalytics[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState(campaignId);
   const [summary, setSummary] = useState<AnalyticsSummary>({
     opens: 0,
     clicks: 0,
     unsubscribes: 0,
     bounces: 0,
+    sent: 0,
     totalEvents: 0,
-    revenue: 0,
-    conversions: 0,
   });
   const [timeframe, setTimeframe] = useState<"day" | "week" | "month">("week");
 
-  // Tallies event counts and revenue into the summary state.
   const calculateSummary = (data: CampaignAnalytics[]) => {
+    const uniqueOpens = new Set<string>();
+    const uniqueClicks = new Set<string>();
+
     const next = data.reduce(
       (acc, event) => {
         acc.totalEvents++;
+        const key = `${event.email || event.subscriber_id}-${event.event_type}`;
         switch (event.event_type) {
           case "open":
-            acc.opens++;
+            if (event.email) uniqueOpens.add(event.email);
+            acc.opens = uniqueOpens.size;
             break;
           case "click":
-            acc.clicks++;
+            if (event.email) uniqueClicks.add(event.email);
+            acc.clicks = uniqueClicks.size;
             break;
           case "unsubscribe":
             acc.unsubscribes++;
@@ -70,11 +81,8 @@ export function AdvancedAnalyticsDashboard({
           case "bounce":
             acc.bounces++;
             break;
-          case "conversion":
-            acc.conversions++;
-            if (event.metadata?.revenue) {
-              acc.revenue += Number(event.metadata.revenue);
-            }
+          case "sent":
+            acc.sent++;
             break;
           default:
             break;
@@ -86,31 +94,38 @@ export function AdvancedAnalyticsDashboard({
         clicks: 0,
         unsubscribes: 0,
         bounces: 0,
+        sent: 0,
         totalEvents: 0,
-        revenue: 0,
-        conversions: 0,
       },
     );
     setSummary(next);
   };
 
-  // Fetches analytics for the campaign and recomputes the summary.
-  const loadAnalytics = async () => {
+  useEffect(() => {
+    if (campaignId === "overview") {
+      getCampaigns().then((list) => {
+        setCampaigns(list);
+        if (list.length > 0 && selectedCampaign === "overview") {
+          setSelectedCampaign(list[0].id);
+        }
+      }).catch(console.error);
+    } else {
+      setSelectedCampaign(campaignId);
+    }
+  }, [campaignId]);
+
+  useEffect(() => {
+    const id = campaignId === "overview" ? selectedCampaign : campaignId;
+    if (id && id !== "undefined" && id !== "overview") {
+      loadAnalytics(id);
+    }
+  }, [campaignId, selectedCampaign, timeframe]);
+
+  const loadAnalytics = async (id: string = selectedCampaign) => {
     try {
-      const { error: tableCheckError } = await supabase
-        .from("campaign_analytics")
-        .select("count")
-        .limit(1);
-
-      if (tableCheckError && tableCheckError.code === "42P01") {
-        setAnalytics([]);
-        calculateSummary([]);
-        return;
-      }
-
-      const data = await getCampaignAnalytics(campaignId);
-      setAnalytics(data);
-      calculateSummary(data);
+      const data = await getCampaignAnalytics(id, timeframe);
+      setAnalytics(data as CampaignAnalytics[]);
+      calculateSummary(data as CampaignAnalytics[]);
     } catch (error) {
       console.error("Error loading analytics:", error);
       toast({
@@ -121,25 +136,47 @@ export function AdvancedAnalyticsDashboard({
     }
   };
 
-  useEffect(() => {
-    if (campaignId && campaignId !== "undefined") {
-      loadAnalytics();
-    }
-  }, [campaignId, timeframe]);
+  const handleExport = () => {
+    if (analytics.length === 0) return;
+    const header = "event_type,email,occurred_at";
+    const rows = analytics.map(
+      (e) =>
+        `${e.event_type},"${(e.email || "").replace(/"/g, '""')}",${e.occurred_at}`,
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analytics-${selectedCampaign}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-  // Percentage of total events represented by `n`, as a fixed string.
-  const rate = (n: number) =>
-    summary.totalEvents > 0
-      ? ((n / summary.totalEvents) * 100).toFixed(1)
+  const openRate =
+    summary.sent > 0
+      ? ((summary.opens / summary.sent) * 100).toFixed(1)
+      : "0";
+  const clickRate =
+    summary.opens > 0
+      ? ((summary.clicks / summary.opens) * 100).toFixed(1)
       : "0";
 
   const tiles = [
-    { label: "Opens", value: String(summary.opens), sub: `${rate(summary.opens)}% of events` },
-    { label: "Clicks", value: String(summary.clicks), sub: `${rate(summary.clicks)}% of events` },
     {
-      label: "Revenue",
-      value: `$${summary.revenue.toFixed(2)}`,
-      sub: `${summary.conversions} conversions`,
+      label: "Sent",
+      value: String(summary.sent),
+      sub: "Emails delivered",
+    },
+    {
+      label: "Opens",
+      value: String(summary.opens),
+      sub: `${openRate}% open rate`,
+    },
+    {
+      label: "Clicks",
+      value: String(summary.clicks),
+      sub: `${clickRate}% click-through`,
     },
     {
       label: "Unsubscribes",
@@ -150,7 +187,6 @@ export function AdvancedAnalyticsDashboard({
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
@@ -159,8 +195,31 @@ export function AdvancedAnalyticsDashboard({
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">
             {campaignId === "overview" ? "Overview" : "Campaign performance"}
           </h2>
+          {campaignId === "overview" && campaigns.length > 0 && (
+            <div className="mt-3 max-w-xs">
+              <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select campaign" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaigns.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
-        <div className="inline-flex rounded-lg border p-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {analytics.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-1" />
+              Export CSV
+            </Button>
+          )}
+          <div className="inline-flex rounded-lg border p-1">
           {(["day", "week", "month"] as const).map((t) => (
             <button
               key={t}
@@ -174,10 +233,10 @@ export function AdvancedAnalyticsDashboard({
               {t}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
-      {/* Stat tiles */}
       <div className="grid grid-cols-2 divide-x divide-y border lg:grid-cols-4 lg:divide-y-0">
         {tiles.map((t) => (
           <div key={t.label} className="p-6">
@@ -192,7 +251,6 @@ export function AdvancedAnalyticsDashboard({
         ))}
       </div>
 
-      {/* Event stream */}
       <div className="border">
         <div className="flex items-center justify-between border-b px-5 py-3.5">
           <h3 className="text-sm font-semibold">Recent events</h3>
@@ -206,7 +264,7 @@ export function AdvancedAnalyticsDashboard({
             <Activity className="mx-auto h-8 w-8 text-muted-foreground/40" />
             <p className="mt-3 text-sm font-medium">No events yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Opens, clicks, and conversions will appear here once you send.
+              Opens, clicks, and unsubscribes will appear here once you send.
             </p>
           </div>
         ) : (

@@ -8,7 +8,6 @@ import {
   getCampaign,
   createCampaign,
   updateCampaign,
-  getSubscribers,
 } from "@/lib/api";
 import { sendCampaign } from "@/lib/brevo";
 import { campaignSchema } from "@/lib/validations";
@@ -91,14 +90,14 @@ const Home = () => {
     setCampaign((prev) => ({ ...prev, details: newDetails }));
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (): Promise<string | undefined> => {
     if (!user) {
       toast({
         variant: "destructive",
         title: "Error",
         description: "You must be logged in to save campaigns",
       });
-      return;
+      return undefined;
     }
 
     // Validate campaign data
@@ -118,7 +117,7 @@ const Home = () => {
         title: "Validation Error",
         description: firstError.message,
       });
-      return;
+      return undefined;
     }
 
     setSaving(true);
@@ -135,22 +134,21 @@ const Home = () => {
       };
 
       if (campaign.id) {
-        // Update existing campaign
         await updateCampaign(campaign.id, campaignData);
         toast({
           title: "Draft Saved",
           description: "Your campaign has been updated successfully.",
         });
+        return campaign.id;
       } else {
-        // Create new campaign
         const newCampaign = await createCampaign(campaignData);
         setCampaign((prev) => ({ ...prev, id: newCampaign.id }));
-        // Update URL to reflect the new campaign ID
         navigate(`/app/campaigns/${newCampaign.id}`, { replace: true });
         toast({
           title: "Draft Saved",
           description: "Your campaign draft has been saved successfully.",
         });
+        return newCampaign.id;
       }
     } catch (error) {
       console.error("Error saving campaign:", error);
@@ -159,42 +157,47 @@ const Home = () => {
         title: "Error",
         description: "Failed to save campaign. Please try again.",
       });
+      return undefined;
     } finally {
       setSaving(false);
     }
   };
 
   const handleSchedule = async (scheduledFor: string) => {
-    if (!campaign.id) {
-      await handleSaveDraft();
+    let campaignId = campaign.id;
+    if (!campaignId) {
+      campaignId = await handleSaveDraft();
     }
 
-    if (campaign.id) {
-      try {
-        await updateCampaign(campaign.id, {
-          status: "scheduled",
-          scheduled_for: scheduledFor,
-        });
-        toast({
-          title: "Campaign Scheduled",
-          description: "Your campaign has been scheduled successfully.",
-        });
-        navigate("/app/campaigns");
-      } catch (error) {
-        console.error("Error scheduling campaign:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to schedule campaign",
-        });
-      }
+    if (!campaignId) return;
+
+    try {
+      await updateCampaign(campaignId, {
+        status: "scheduled",
+        scheduled_for: scheduledFor,
+      });
+      toast({
+        title: "Campaign Scheduled",
+        description: "Your campaign has been scheduled successfully.",
+      });
+      navigate("/app/campaigns");
+    } catch (error) {
+      console.error("Error scheduling campaign:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to schedule campaign",
+      });
     }
   };
 
   const handleSend = async () => {
-    if (!campaign.id) {
-      await handleSaveDraft();
+    let campaignId = campaign.id;
+    if (!campaignId) {
+      campaignId = await handleSaveDraft();
     }
+
+    if (!campaignId) return;
 
     if (!campaign.details.subscriberList) {
       toast({
@@ -206,24 +209,8 @@ const Home = () => {
     }
 
     try {
-      // Fetch subscribers from the selected list
-      const subscribers = await getSubscribers(campaign.details.subscriberList);
-      const subscriberEmails = subscribers
-        .filter((sub) => !sub.unsubscribed_at)
-        .map((sub) => sub.email);
-
-      if (subscriberEmails.length === 0) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "No active subscribers in the selected list",
-        });
-        return;
-      }
-
-      // Send campaign
       const campaignToSend: Campaign = {
-        id: campaign.id!,
+        id: campaignId,
         title: campaign.title,
         subject: campaign.details.subject,
         sender_name: campaign.details.senderName,
@@ -235,25 +222,22 @@ const Home = () => {
         updated_at: new Date().toISOString(),
       };
 
-      await sendCampaign(campaignToSend, subscriberEmails);
-
-      // Update campaign status
-      await updateCampaign(campaign.id!, {
-        status: "sent",
-        sent_at: new Date().toISOString(),
-      });
+      const result = (await sendCampaign(campaignToSend)) as { sent?: number };
+      const sentCount = result.sent ?? 0;
 
       toast({
         title: "Campaign Sent",
-        description: `Your campaign has been sent to ${subscriberEmails.length} subscribers.`,
+        description: `Your campaign has been sent to ${sentCount} subscribers.`,
       });
       navigate("/app/campaigns");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error sending campaign:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to send campaign. Please try again.";
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to send campaign. Please try again.",
+        description: message,
       });
     }
   };
@@ -288,6 +272,8 @@ const Home = () => {
             onDetailsChange={handleDetailsChange}
             initialContent={campaign.content}
             initialDetails={campaign.details}
+            onSaveDraft={handleSaveDraft}
+            saving={saving}
           />
         </div>
       </div>

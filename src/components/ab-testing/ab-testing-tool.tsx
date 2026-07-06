@@ -1,341 +1,415 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
-  SplitSquareVertical,
-  BarChart,
-  Sparkles,
-  Plus,
-  Trash,
-  Copy,
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
+import { getCampaigns, getSubscribers } from "@/lib/api";
+import { sendCampaign } from "@/lib/brevo";
+import type { Campaign } from "@/types";
+import { Plus, Trash2, Play, Trophy } from "lucide-react";
+
+interface Variant {
+  id: string;
+  name: string;
+  subject: string;
+}
+
+interface AbTest {
+  id: string;
+  campaign_id: string;
+  name: string;
+  variants: Variant[];
+  status: string;
+  winner_variant_id: string | null;
+  winner_metric: string | null;
+}
 
 export function ABTestingTool() {
-  const [variants, setVariants] = useState([
-    {
-      id: 1,
-      name: "Variant A",
-      subject: "Discover our new features",
-      openRate: 24.5,
-    },
-    {
-      id: 2,
-      name: "Variant B",
-      subject: "New features just for you",
-      openRate: 28.7,
-    },
+  const { toast } = useToast();
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
+  const [testName, setTestName] = useState("");
+  const [variants, setVariants] = useState<Variant[]>([
+    { id: "a", name: "Variant A", subject: "" },
+    { id: "b", name: "Variant B", subject: "" },
   ]);
+  const [tests, setTests] = useState<AbTest[]>([]);
+  const [activeTest, setActiveTest] = useState<AbTest | null>(null);
+  const [results, setResults] = useState<Record<string, { opens: number; clicks: number; sent: number }>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    getCampaigns().then(setCampaigns).catch(console.error);
+    loadTests();
+  }, []);
+
+  const loadTests = async () => {
+    const { data, error } = await supabase
+      .from("ab_tests")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error && data) setTests(data as AbTest[]);
+  };
 
   const addVariant = () => {
-    const newId = Math.max(...variants.map((v) => v.id)) + 1;
+    const id = String.fromCharCode(97 + variants.length);
     setVariants([
       ...variants,
-      {
-        id: newId,
-        name: `Variant ${String.fromCharCode(65 + variants.length)}`, // A, B, C, etc.
-        subject: "",
-        openRate: 0,
-      },
+      { id, name: `Variant ${id.toUpperCase()}`, subject: "" },
     ]);
   };
 
-  const removeVariant = (id: number) => {
-    if (variants.length <= 2) return; // Keep at least 2 variants
+  const removeVariant = (id: string) => {
+    if (variants.length <= 2) return;
     setVariants(variants.filter((v) => v.id !== id));
   };
 
+  const createTest = async () => {
+    if (!selectedCampaignId || !testName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Missing fields",
+        description: "Select a campaign and enter a test name.",
+      });
+      return;
+    }
+
+    if (variants.some((v) => !v.subject.trim())) {
+      toast({
+        variant: "destructive",
+        title: "Missing subjects",
+        description: "Each variant needs a subject line.",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("ab_tests")
+        .insert({
+          campaign_id: selectedCampaignId,
+          name: testName,
+          variants,
+          status: "draft",
+          winner_metric: "open_rate",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setTests([data as AbTest, ...tests]);
+      setTestName("");
+      toast({ title: "A/B test created", description: "Ready to run." });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create test.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runTest = async (test: AbTest) => {
+    const campaign = campaigns.find((c) => c.id === test.campaign_id);
+    if (!campaign?.list_id) {
+      toast({
+        variant: "destructive",
+        title: "No subscriber list",
+        description: "The campaign must have a subscriber list assigned.",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const subscribers = await getSubscribers(campaign.list_id);
+      const emails = subscribers
+        .filter((s) => !s.unsubscribed_at)
+        .map((s) => s.email);
+
+      if (emails.length < test.variants.length) {
+        toast({
+          variant: "destructive",
+          title: "Not enough subscribers",
+          description: `Need at least ${test.variants.length} active subscribers.`,
+        });
+        return;
+      }
+
+      const chunkSize = Math.floor(emails.length / test.variants.length);
+
+      for (let i = 0; i < test.variants.length; i++) {
+        const variant = test.variants[i];
+        const start = i * chunkSize;
+        const end = i === test.variants.length - 1 ? emails.length : start + chunkSize;
+        const batch = emails.slice(start, end);
+
+        await sendCampaign(
+          { ...campaign, subject: variant.subject },
+          {
+            recipients: batch,
+            subjectOverride: variant.subject,
+            variantId: variant.id,
+            updateCampaignStatus: false,
+          },
+        );
+      }
+
+      await supabase
+        .from("ab_tests")
+        .update({ status: "running", start_date: new Date().toISOString() })
+        .eq("id", test.id);
+
+      await loadTests();
+      toast({
+        title: "Test started",
+        description: `Sent ${test.variants.length} variants to your list.`,
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Failed to run test",
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadResults = async (test: AbTest) => {
+    setActiveTest(test);
+    const { data } = await supabase
+      .from("campaign_analytics")
+      .select("event_type, email, metadata")
+      .eq("campaign_id", test.campaign_id);
+
+    const variantResults: Record<string, { opens: number; sent: number; clicks: number }> = {};
+    const openSets: Record<string, Set<string>> = {};
+    const clickSets: Record<string, Set<string>> = {};
+
+    for (const v of test.variants) {
+      variantResults[v.id] = { opens: 0, clicks: 0, sent: 0 };
+      openSets[v.id] = new Set();
+      clickSets[v.id] = new Set();
+    }
+
+    for (const event of data || []) {
+      const meta = event.metadata as { variant_id?: string } | null;
+      const variantId =
+        meta?.variant_id ||
+        (event as { variant_id?: string }).variant_id ||
+        test.variants[0]?.id;
+
+      if (!variantId || !variantResults[variantId]) continue;
+
+      if (event.event_type === "sent") {
+        variantResults[variantId].sent++;
+      }
+      if (event.event_type === "open" && event.email) {
+        openSets[variantId].add(event.email);
+      }
+      if (event.event_type === "click" && event.email) {
+        clickSets[variantId].add(event.email);
+      }
+    }
+
+    for (const v of test.variants) {
+      variantResults[v.id].opens = openSets[v.id].size;
+      variantResults[v.id].clicks = clickSets[v.id].size;
+    }
+
+    setResults(variantResults);
+  };
+
+  const applyWinner = async (test: AbTest, variantId: string) => {
+    const variant = test.variants.find((v) => v.id === variantId);
+    if (!variant) return;
+
+    await supabase
+      .from("campaigns")
+      .update({ subject: variant.subject })
+      .eq("id", test.campaign_id);
+
+    await supabase
+      .from("ab_tests")
+      .update({
+        status: "completed",
+        winner_variant_id: variantId,
+        end_date: new Date().toISOString(),
+      })
+      .eq("id", test.id);
+
+    await loadTests();
+    toast({
+      title: "Winner applied",
+      description: `Campaign subject updated to "${variant.subject}"`,
+    });
+  };
+
   return (
-    <Card className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold">A/B Testing</h3>
-        <Button
-          variant="outline"
-          onClick={addVariant}
-          disabled={variants.length >= 5}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Variant
-        </Button>
+    <div className="space-y-8">
+      <div>
+        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+          Experiments
+        </p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight">A/B Testing</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Subject-line tests only. Each variant is tagged for per-variant analytics.
+        </p>
       </div>
 
-      <Tabs defaultValue="setup">
-        <TabsList className="mb-6">
-          <TabsTrigger value="setup">Test Setup</TabsTrigger>
+      <Tabs defaultValue="create">
+        <TabsList>
+          <TabsTrigger value="create">Create test</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
-          <TabsTrigger value="ai">AI Optimization</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="setup" className="space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Test Elements</Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-md flex items-center gap-3">
-                  <input type="checkbox" className="h-4 w-4" defaultChecked />
-                  <div>
-                    <h5 className="font-medium">Subject Line</h5>
-                    <p className="text-xs text-muted-foreground">
-                      Test different subject lines
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 border rounded-md flex items-center gap-3">
-                  <input type="checkbox" className="h-4 w-4" />
-                  <div>
-                    <h5 className="font-medium">Email Content</h5>
-                    <p className="text-xs text-muted-foreground">
-                      Test different email bodies
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 border rounded-md flex items-center gap-3">
-                  <input type="checkbox" className="h-4 w-4" />
-                  <div>
-                    <h5 className="font-medium">Send Time</h5>
-                    <p className="text-xs text-muted-foreground">
-                      Test different sending times
-                    </p>
-                  </div>
-                </div>
+        <TabsContent value="create" className="space-y-6 mt-6">
+          <Card className="p-6 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Campaign</Label>
+                <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select campaign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {campaigns.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Test name</Label>
+                <Input
+                  value={testName}
+                  onChange={(e) => setTestName(e.target.value)}
+                  placeholder="Subject line test"
+                />
               </div>
             </div>
 
-            <div className="space-y-4">
-              <Label>Test Variants</Label>
-              {variants.map((variant, index) => (
-                <div
-                  key={variant.id}
-                  className="p-4 border rounded-md space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{variant.name}</Badge>
-                      <span className="text-sm text-muted-foreground">
-                        Distribution: {Math.floor(100 / variants.length)}%
-                      </span>
+            <div className="space-y-3">
+              <Label>Variants (subject lines)</Label>
+              {variants.map((v) => (
+                <div key={v.id} className="flex gap-2">
+                  <Input
+                    value={v.subject}
+                    onChange={(e) =>
+                      setVariants(
+                        variants.map((x) =>
+                          x.id === v.id ? { ...x, subject: e.target.value } : x,
+                        ),
+                      )
+                    }
+                    placeholder={`${v.name} subject line`}
+                  />
+                  {variants.length > 2 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeVariant(v.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={addVariant}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add variant
+              </Button>
+            </div>
+
+            <Button onClick={createTest} disabled={loading}>
+              Create test
+            </Button>
+          </Card>
+
+          <div className="space-y-3">
+            <h3 className="font-semibold">Your tests</h3>
+            {tests.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tests yet.</p>
+            ) : (
+              tests.map((test) => (
+                <Card key={test.id} className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{test.name}</p>
+                    <p className="text-sm text-muted-foreground capitalize">
+                      {test.status} · {test.variants.length} variants
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {test.status === "draft" && (
+                      <Button size="sm" onClick={() => runTest(test)} disabled={loading}>
+                        <Play className="h-4 w-4 mr-1" />
+                        Run
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => loadResults(test)}>
+                      View results
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="results" className="mt-6">
+          {activeTest ? (
+            <Card className="p-6 space-y-4">
+              <h3 className="font-semibold">{activeTest.name}</h3>
+              {activeTest.variants.map((v) => {
+                const r = results[v.id] || { opens: 0, clicks: 0, sent: 0 };
+                const openRate =
+                  r.sent > 0 ? ((r.opens / r.sent) * 100).toFixed(1) : "0";
+                return (
+                  <div
+                    key={v.id}
+                    className="flex items-center justify-between p-4 border rounded-md"
+                  >
+                    <div>
+                      <p className="font-medium">{v.name}</p>
+                      <p className="text-sm text-muted-foreground">{v.subject}</p>
+                      <p className="text-xs mt-1">
+                        {r.opens} opens · {r.clicks} clicks · {openRate}% open rate
+                      </p>
                     </div>
-                    {variants.length > 2 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeVariant(variant.id)}
-                      >
-                        <Trash className="h-4 w-4 text-destructive" />
+                    {activeTest.status === "running" && (
+                      <Button size="sm" onClick={() => applyWinner(activeTest, v.id)}>
+                        <Trophy className="h-4 w-4 mr-1" />
+                        Apply winner
                       </Button>
                     )}
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`subject-${variant.id}`}>
-                      Subject Line
-                    </Label>
-                    <Input
-                      id={`subject-${variant.id}`}
-                      placeholder="Enter subject line"
-                      value={variant.subject}
-                      onChange={(e) => {
-                        const newVariants = [...variants];
-                        const idx = newVariants.findIndex(
-                          (v) => v.id === variant.id,
-                        );
-                        newVariants[idx].subject = e.target.value;
-                        setVariants(newVariants);
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Test Settings</Label>
-              <div className="p-4 border rounded-md space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h5 className="font-medium">Sample Size</h5>
-                    <p className="text-sm text-muted-foreground">
-                      Percentage of your audience to include in the test
-                    </p>
-                  </div>
-                  <div className="w-32">
-                    <Input type="number" min="10" max="100" defaultValue="20" />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h5 className="font-medium">Winner Selection</h5>
-                    <p className="text-sm text-muted-foreground">
-                      Metric to determine the winning variant
-                    </p>
-                  </div>
-                  <select className="p-2 border rounded-md">
-                    <option>Open Rate</option>
-                    <option>Click Rate</option>
-                    <option>Conversion Rate</option>
-                    <option>Revenue</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h5 className="font-medium">Auto-Send Winner</h5>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically send the winning variant to remaining
-                      audience
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="results" className="space-y-6">
-          <div className="space-y-4">
-            <div className="p-4 border rounded-md">
-              <h4 className="font-semibold mb-4">Test Results</h4>
-
-              <div className="space-y-6">
-                {variants.map((variant) => (
-                  <div key={variant.id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {variant.openRate ===
-                          Math.max(...variants.map((v) => v.openRate)) && (
-                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                            Winner
-                          </Badge>
-                        )}
-                        <span className="font-medium">{variant.name}</span>
-                      </div>
-                      <span className="font-bold">{variant.openRate}%</span>
-                    </div>
-                    <Progress value={variant.openRate} className="h-2" />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Subject: {variant.subject}</span>
-                      <span>
-                        Sent to: {Math.floor(1000 / variants.length)} recipients
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 pt-6 border-t">
-                <h5 className="font-medium mb-2">Statistical Significance</h5>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="bg-blue-50 text-blue-700 border-blue-200"
-                  >
-                    95% Confidence
-                  </Badge>
-                  <span className="text-sm">
-                    Results are statistically significant
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline">
-                <BarChart className="h-4 w-4 mr-2" />
-                Export Report
-              </Button>
-              <Button>
-                <SplitSquareVertical className="h-4 w-4 mr-2" />
-                Apply Winner
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="ai" className="space-y-6">
-          <div className="space-y-4">
-            <div className="p-4 border rounded-md space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold">AI-Powered Optimization</h4>
-                <Badge
-                  variant="outline"
-                  className="bg-purple-50 text-purple-700 border-purple-200"
-                >
-                  Premium Feature
-                </Badge>
-              </div>
-
-              <p className="text-sm text-muted-foreground">
-                Let our AI analyze your campaign and generate optimized variants
-                based on your audience and past performance data.
-              </p>
-
-              <div className="space-y-2">
-                <Label>Optimization Target</Label>
-                <select className="w-full p-2 border rounded-md">
-                  <option>Maximize Open Rate</option>
-                  <option>Maximize Click-Through Rate</option>
-                  <option>Maximize Conversion Rate</option>
-                  <option>Maximize Revenue</option>
-                </select>
-              </div>
-
-              <Button className="w-full">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate AI Variants
-              </Button>
-            </div>
-
-            <div className="p-4 border rounded-md space-y-4">
-              <h4 className="font-semibold">AI Suggestions</h4>
-
-              <div className="space-y-3">
-                <div className="p-3 bg-muted/30 rounded-md">
-                  <div className="flex justify-between items-start">
-                    <h5 className="font-medium">Subject Line Suggestion</h5>
-                    <Button variant="ghost" size="sm">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-sm mt-1">
-                    "Exclusive: See what's new with our latest features"
-                  </p>
-                </div>
-
-                <div className="p-3 bg-muted/30 rounded-md">
-                  <div className="flex justify-between items-start">
-                    <h5 className="font-medium">Call-to-Action Suggestion</h5>
-                    <Button variant="ghost" size="sm">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-sm mt-1">"Upgrade Now and Get 20% Off"</p>
-                </div>
-
-                <div className="p-3 bg-muted/30 rounded-md">
-                  <div className="flex justify-between items-start">
-                    <h5 className="font-medium">Send Time Suggestion</h5>
-                    <Button variant="ghost" size="sm">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-sm mt-1">
-                    Tuesday at 10:30 AM (recipient's local time)
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+                );
+              })}
+            </Card>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Select a test and click &quot;View results&quot; from the Create tab.
+            </p>
+          )}
         </TabsContent>
       </Tabs>
-    </Card>
+    </div>
   );
 }

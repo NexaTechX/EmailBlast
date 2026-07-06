@@ -57,14 +57,9 @@ export async function scrapeWebsiteForLeads(
       companyInfo: ".company-info, .about-company, footer, .contact-info",
     };
 
-    const requestBody: FirecrawlRequestBody = {
+    const requestBody = {
       url,
-      selectors,
-      options: {
-        javascript: true,
-        timeout: 30000,
-        waitForSelector: "body",
-      },
+      formats: ["markdown", "html"],
     };
 
     const response = await firecrawlFetch("scrape", {
@@ -77,34 +72,24 @@ export async function scrapeWebsiteForLeads(
       );
     }
 
-    const data: FirecrawlResponse = await response.json();
+    const data = await response.json();
+    const pageContent =
+      data?.data?.markdown || data?.data?.html || data?.data?.content || "";
 
-    if (!data.success) {
-      throw new Error(data.error || "Unknown error from Firecrawl API");
+    if (!pageContent) {
+      return [];
     }
 
-    // Process the scraped data into leads
+    const emails = extractEmails(pageContent);
+
     const leads: Lead[] = [];
-    const companyName = extractCompanyName(url, data.data.companyInfo);
+    const companyName = extractCompanyName(url, pageContent);
     const domain = new URL(url).hostname;
 
-    // Extract emails
-    const emails = extractEmails(data.data.emails);
-
-    // Extract names
-    const names = extractNames(data.data.names);
-
-    // Extract titles
-    const titles = extractTitles(data.data.titles);
-
-    // Extract phones
-    const phones = extractPhones(data.data.phones);
-
-    // Extract LinkedIn profiles
-    const linkedInProfiles = extractLinkedIn(data.data.linkedin);
-
-    // Create leads from the extracted data
-    // Match emails with names and titles where possible
+    const names = extractNames(pageContent);
+    const titles = extractTitles(pageContent);
+    const phones = extractPhones(pageContent);
+    const linkedInProfiles = extractLinkedIn(pageContent);
     for (let i = 0; i < Math.min(emails.length, maxLeads); i++) {
       const email = emails[i];
       const name = i < names.length ? names[i] : generateNameFromEmail(email);
@@ -121,9 +106,9 @@ export async function scrapeWebsiteForLeads(
         phone,
         linkedin,
         website: url,
-        industry: detectIndustry(url, data.data.companyInfo),
+        industry: detectIndustry(url, pageContent),
         employees: "Unknown",
-        location: detectLocation(data.data.companyInfo),
+        location: detectLocation(pageContent),
         confidenceScore: 70,
       });
     }

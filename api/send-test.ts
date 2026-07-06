@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
+import { requireAuth } from "./_lib/auth";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -7,6 +8,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const auth = await requireAuth(req);
+  if ("error" in auth) {
+    return res.status(auth.status).json({ error: auth.error });
   }
 
   const { subject, html, from, to } = (req.body || {}) as {

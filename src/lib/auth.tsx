@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { client } from "./neon";
+import { ensureDefaultSubscriberList } from "./api";
 
 // Minimal user shape we rely on (Neon Auth user via the Supabase-compatible adapter).
 type AuthUser = {
@@ -45,6 +46,7 @@ async function ensureProfile() {
         { updated_at: new Date().toISOString() },
         { onConflict: "id", ignoreDuplicates: true },
       );
+    await ensureDefaultSubscriberList();
   } catch (error) {
     console.error("Error ensuring profile:", error);
   }

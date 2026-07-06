@@ -3,6 +3,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
+import UnderlineExtension from "@tiptap/extension-underline";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -34,7 +35,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Separator } from "../ui/separator";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   generateContentWithGemini,
   enhanceContentWithGemini,
@@ -56,6 +57,7 @@ const RichTextEditor = ({
   const editor = useEditor({
     extensions: [
       StarterKit,
+      UnderlineExtension,
       Image,
       Link.configure({
         openOnClick: false,
@@ -69,6 +71,12 @@ const RichTextEditor = ({
       onChange(editor.getHTML());
     },
   });
+
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content, false);
+    }
+  }, [content, editor]);
 
   const addImage = () => {
     const url = window.prompt(
@@ -241,8 +249,8 @@ const RichTextEditor = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={editor.isActive("strike") ? "bg-muted" : ""}
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            className={editor.isActive("underline") ? "bg-muted" : ""}
           >
             <Underline className="h-4 w-4" />
           </Button>

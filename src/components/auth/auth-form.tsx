@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/auth";
+import { signUpSchema } from "@/lib/validations";
+import { client } from "@/lib/neon";
 import { MailCheck } from "lucide-react";
 
-// Labelled input row with an optional trailing action (e.g. a "Forgot?" link).
-// Extracted so the form markup stays shallow.
 function LabeledInput({
   id,
   label,
@@ -34,7 +34,6 @@ function LabeledInput({
   );
 }
 
-// Sign-in / sign-up form with an inline email-verification (OTP) step.
 export function AuthForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
@@ -44,15 +43,39 @@ export function AuthForm() {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const { signIn, signUp, verifyEmailOtp, resendVerification } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Returns a user-facing message from an unknown error, with a fallback.
   const errorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
 
-  // Handles sign in or sign up; routes to the verification step when needed.
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await client.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      });
+      if (error) throw error;
+      toast({
+        title: "Reset email sent",
+        description: `Check ${resetEmail} for password reset instructions.`,
+      });
+      setShowForgot(false);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't send reset email",
+        description: errorMessage(error, "Please try again."),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -61,6 +84,19 @@ export function AuthForm() {
         await signIn(email, password);
         navigate("/app");
       } else {
+        const validation = signUpSchema.safeParse({
+          email,
+          password,
+          confirmPassword: password,
+        });
+        if (!validation.success) {
+          toast({
+            variant: "destructive",
+            title: "Validation error",
+            description: validation.error.errors[0].message,
+          });
+          return;
+        }
         const { needsVerification } = await signUp(
           email,
           password,
@@ -84,7 +120,6 @@ export function AuthForm() {
     }
   };
 
-  // Submits the emailed OTP code to establish a session.
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingEmail) return;
@@ -99,9 +134,6 @@ export function AuthForm() {
         toast({ title: "Email verified", description: "Welcome to EmailBlast." });
         navigate("/app");
       } else {
-        // Email is verified but no session was opened (e.g. the password isn't
-        // in state after a reload). Send them to sign in rather than bounce off
-        // a protected route.
         toast({
           title: "Email verified",
           description: "Please sign in to continue.",
@@ -122,7 +154,6 @@ export function AuthForm() {
     }
   };
 
-  // Requests a fresh verification code for the pending email.
   const handleResend = async () => {
     if (!pendingEmail) return;
     try {
@@ -140,8 +171,41 @@ export function AuthForm() {
     }
   };
 
-  // Verification screen — the account was created but Neon Auth requires the
-  // email code before a session is issued.
+  if (showForgot) {
+    return (
+      <div className="space-y-7">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Reset your password
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Enter your email and we&apos;ll send reset instructions.
+          </p>
+        </div>
+        <form onSubmit={handleForgotPassword} className="space-y-4">
+          <LabeledInput
+            id="reset-email"
+            label="Email"
+            type="email"
+            value={resetEmail}
+            onChange={(e) => setResetEmail(e.target.value)}
+            required
+          />
+          <Button type="submit" className="h-11 w-full" disabled={loading}>
+            {loading ? "Sending..." : "Send reset link"}
+          </Button>
+        </form>
+        <button
+          type="button"
+          onClick={() => setShowForgot(false)}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          Back to sign in
+        </button>
+      </div>
+    );
+  }
+
   if (pendingEmail) {
     return (
       <div className="space-y-7">
@@ -217,7 +281,6 @@ export function AuthForm() {
         </p>
       </div>
 
-      {/* Segmented toggle */}
       <div className="inline-flex w-full rounded-lg border p-1">
         {(["login", "register"] as const).map((m) => (
           <button
@@ -269,9 +332,16 @@ export function AuthForm() {
           required
           action={
             mode === "login" ? (
-              <span className="cursor-pointer text-xs text-muted-foreground transition-colors hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => {
+                  setResetEmail(email);
+                  setShowForgot(true);
+                }}
+                className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
                 Forgot?
-              </span>
+              </button>
             ) : null
           }
         />
@@ -287,13 +357,19 @@ export function AuthForm() {
 
       <p className="text-center text-xs leading-relaxed text-muted-foreground">
         By continuing you agree to our{" "}
-        <span className="cursor-pointer text-foreground underline underline-offset-2">
+        <Link
+          to="/legal/terms"
+          className="text-foreground underline underline-offset-2"
+        >
           Terms
-        </span>{" "}
+        </Link>{" "}
         and{" "}
-        <span className="cursor-pointer text-foreground underline underline-offset-2">
+        <Link
+          to="/legal/privacy"
+          className="text-foreground underline underline-offset-2"
+        >
           Privacy Policy
-        </span>
+        </Link>
         .
       </p>
     </div>

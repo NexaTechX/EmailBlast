@@ -56,6 +56,9 @@ project (Settings → Environment Variables) for production.
 - `GROQ_API_KEY`
 - `FIRECRAWL_API_KEY` — **must be rotated** (see Security)
 - `APP_URL` — same as `VITE_APP_URL`; read by the server functions for link building
+- `CRON_SECRET` — required in production for `/api/cron/send-scheduled`
+- `RESEND_WEBHOOK_SECRET` — required in production for `/api/webhooks/resend`
+- `TRACKING_SECRET` — HMAC for signed unsubscribe/tracking links (optional in dev)
 
 > The server functions read `APP_URL || VITE_APP_URL`. Set at least one in Vercel.
 
@@ -84,8 +87,16 @@ npm run db:generate
 # Push the schema + RLS policies to Neon
 npm run db:push        # (drizzle-kit push --force)
 
+# Apply SQL migrations (Windows-friendly; no psql required)
+npm run db:migrate
+
+# Or apply individual files in the Neon SQL Editor:
+# - drizzle/migrations/0001_sent_event_and_auth_grant.sql
+# - drizzle/migrations/0002_profile_sending_fields.sql
+
 # Apply the updated_at triggers (drizzle can't express these from schema)
-psql "$DATABASE_URL" -f drizzle/triggers.sql
+# psql "$DATABASE_URL" -f drizzle/triggers.sql
+# (or paste drizzle/triggers.sql into Neon SQL Editor)
 ```
 
 Expected result: 11 tables, 32 RLS policies, 10 `updated_at` triggers.

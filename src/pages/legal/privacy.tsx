@@ -105,10 +105,10 @@ export default function PrivacyPolicy() {
                 We share your information with third-party service providers who perform services on our behalf, such as:
               </p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-2 mt-2">
-                <li>Email delivery services (Brevo, SendGrid)</li>
-                <li>Payment processors (Stripe)</li>
-                <li>Cloud hosting providers (Supabase, AWS)</li>
-                <li>Analytics providers</li>
+                <li>Email delivery (Resend)</li>
+                <li>Database and auth (Neon)</li>
+                <li>Hosting (Vercel)</li>
+                <li>AI features during beta (Groq)</li>
               </ul>
 
               <h3 className="text-lg font-medium mb-2 mt-4">Legal Requirements</h3>
@@ -249,7 +249,8 @@ export default function PrivacyPolicy() {
               </p>
               <p className="text-muted-foreground leading-relaxed mt-2">
                 Email: privacy@emailblast.com<br />
-                Address: [Your Business Address]<br />
+                Email: support@emailblast.com<br />
+                EmailBlast is operated during free beta; a physical business address is shown in emails you send via the platform (Settings → Sending).
                 Data Protection Officer: [DPO Contact Information]
               </p>
             </section>

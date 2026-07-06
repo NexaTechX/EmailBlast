@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   X,
+  FlaskConical,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,8 @@ const navigation = [
   { name: "Campaigns", href: "/app/campaigns", icon: Send },
   { name: "Subscribers", href: "/app/subscribers", icon: Users },
   { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
-  { name: "Lead finder", href: "/app/lead-finder", icon: Radar },
+  { name: "A/B Testing", href: "/app/ab-testing", icon: FlaskConical },
+  { name: "Lead finder (beta)", href: "/app/lead-finder", icon: Radar },
   { name: "Settings", href: "/app/settings", icon: Settings },
 ];
 
@@ -129,7 +131,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   {email || "Your account"}
                 </p>
                 <p className="font-mono text-[10px] text-muted-foreground">
-                  Free plan
+                  Free beta
                 </p>
               </div>
             </div>

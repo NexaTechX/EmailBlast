@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "@/components/theme-provider";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,24 @@ export function PreferencesSettings() {
     marketingEmails: false,
     weeklyDigest: true,
   });
+
+  useEffect(() => {
+    const loadPreferences = async () => {
+      const { data, error } = await supabase
+        .from("user_preferences")
+        .select("email_notifications, marketing_emails, weekly_digest")
+        .maybeSingle();
+
+      if (!error && data) {
+        setPreferences({
+          emailNotifications: data.email_notifications ?? true,
+          marketingEmails: data.marketing_emails ?? false,
+          weeklyDigest: data.weekly_digest ?? true,
+        });
+      }
+    };
+    loadPreferences();
+  }, []);
 
   const handleSave = async () => {
     setLoading(true);

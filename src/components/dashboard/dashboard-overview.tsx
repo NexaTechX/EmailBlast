@@ -42,7 +42,12 @@ export function DashboardOverview() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch campaigns
+      const { count: totalCampaigns, error: countError } = await supabase
+        .from("campaigns")
+        .select("*", { count: "exact", head: true });
+
+      if (countError) throw countError;
+
       const { data: campaigns, error: campaignsError } = await supabase
         .from("campaigns")
         .select("*")
@@ -51,41 +56,45 @@ export function DashboardOverview() {
 
       if (campaignsError) throw campaignsError;
 
-      // Fetch subscribers
       const { data: subscribers, error: subscribersError } = await supabase
         .from("subscribers")
         .select("unsubscribed_at");
 
       if (subscribersError) throw subscribersError;
 
-      // Fetch analytics for calculating open rate
       const { data: analytics, error: analyticsError } = await supabase
         .from("campaign_analytics")
-        .select("event_type, campaign_id");
+        .select("event_type, email");
 
-      // Count sent campaigns for open rate calculation
-      const sentCampaigns = campaigns?.filter((c) => c.status === "sent") || [];
-      
-      // Calculate open rate
-      let totalOpens = 0;
-      let totalClicks = 0;
-      if (analytics) {
-        totalOpens = analytics.filter((a) => a.event_type === "open").length;
-        totalClicks = analytics.filter((a) => a.event_type === "click").length;
-      }
+      if (analyticsError) throw analyticsError;
 
-      const activeSubscribers = subscribers?.filter((s) => !s.unsubscribed_at) || [];
-      const openRate = sentCampaigns.length > 0 && activeSubscribers.length > 0
-        ? (totalOpens / (sentCampaigns.length * activeSubscribers.length)) * 100
-        : 0;
-      
-      const clickRate = totalOpens > 0
-        ? (totalClicks / totalOpens) * 100
-        : 0;
+      const activeSubscribers =
+        subscribers?.filter((s) => !s.unsubscribed_at) || [];
+
+      const sentCount =
+        analytics?.filter((a) => a.event_type === "sent").length || 0;
+      const uniqueOpens = new Set(
+        analytics
+          ?.filter((a) => a.event_type === "open" && a.email)
+          .map((a) => a.email) || [],
+      );
+      const uniqueClicks = new Set(
+        analytics
+          ?.filter((a) => a.event_type === "click" && a.email)
+          .map((a) => a.email) || [],
+      );
+
+      const openRate =
+        sentCount > 0 ? (uniqueOpens.size / sentCount) * 100 : 0;
+      const clickRate =
+        uniqueOpens.size > 0 ? (uniqueClicks.size / uniqueOpens.size) * 100 : 0;
 
       setStats({
-        totalCampaigns: campaigns?.length || 0,
-        activeCampaigns: campaigns?.filter((c) => c.status === "scheduled" || c.status === "sending").length || 0,
+        totalCampaigns: totalCampaigns || 0,
+        activeCampaigns:
+          campaigns?.filter(
+            (c) => c.status === "scheduled" || c.status === "sending",
+          ).length || 0,
         totalSubscribers: subscribers?.length || 0,
         activeSubscribers: activeSubscribers.length,
         averageOpenRate: Math.round(openRate * 10) / 10,
@@ -137,13 +146,13 @@ export function DashboardOverview() {
     {
       label: "Open rate",
       value: `${stats.averageOpenRate}%`,
-      sub: "Average",
+      sub: "Unique opens / sent",
       to: "/app/analytics",
     },
     {
       label: "Click rate",
       value: `${stats.averageClickRate}%`,
-      sub: "Average",
+      sub: "Unique clicks / opens",
       to: "/app/analytics",
     },
   ];
@@ -175,7 +184,6 @@ export function DashboardOverview() {
     <>
       <WelcomeModal />
       <div className="space-y-8">
-        {/* Header */}
         <div className="flex items-end justify-between">
           <div>
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
@@ -191,7 +199,6 @@ export function DashboardOverview() {
           </Button>
         </div>
 
-        {/* Stat tiles — ruled grid */}
         <div className="grid grid-cols-2 divide-x divide-y border lg:grid-cols-4 lg:divide-y-0">
           {statTiles.map((t) => (
             <button
@@ -210,9 +217,7 @@ export function DashboardOverview() {
           ))}
         </div>
 
-        {/* Recent + quick actions */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
-          {/* Recent campaigns */}
           <div className="border">
             <div className="flex items-center justify-between border-b px-5 py-3.5">
               <h3 className="text-sm font-semibold">Recent campaigns</h3>
@@ -270,7 +275,6 @@ export function DashboardOverview() {
             )}
           </div>
 
-          {/* Quick actions */}
           <div className="border">
             <div className="border-b px-5 py-3.5">
               <h3 className="text-sm font-semibold">Quick actions</h3>

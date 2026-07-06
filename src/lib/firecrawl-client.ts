@@ -8,14 +8,17 @@ type FirecrawlInit = {
   body?: string;
 };
 
+import { authHeaders } from "./api-client";
+
 /** Route a Firecrawl request through the server proxy (/api/scrape). */
-export function firecrawlFetch(
+export async function firecrawlFetch(
   path: "scrape" | "map" | "search",
   init: FirecrawlInit = {},
 ): Promise<Response> {
+  const headers = await authHeaders();
   return fetch("/api/scrape", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       path,
       method: init.method ?? "POST",

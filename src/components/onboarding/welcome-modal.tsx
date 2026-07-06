@@ -8,182 +8,165 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Check, Mail, Users, BarChart, Rocket } from "lucide-react";
+import { Check, Circle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getSubscriberLists } from "@/lib/api";
 
-interface WelcomeStep {
+interface ChecklistItem {
   id: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  action?: () => void;
-  actionLabel?: string;
+  label: string;
+  done: boolean;
+  href: string;
 }
 
 export function WelcomeModal() {
   const [open, setOpen] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const refreshChecklist = async () => {
+    if (!user?.id) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("mailing_address, onboarding_completed_at")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    let lists: { id: string }[] = [];
+    try {
+      lists = await getSubscriberLists();
+    } catch {
+      /* ignore */
+    }
+
+    const { count: subCount } = await supabase
+      .from("subscribers")
+      .select("*", { count: "exact", head: true });
+
+    const { count: campaignCount } = await supabase
+      .from("campaigns")
+      .select("*", { count: "exact", head: true });
+
+    const { count: sentCount } = await supabase
+      .from("campaign_analytics")
+      .select("*", { count: "exact", head: true })
+      .eq("event_type", "sent");
+
+    setChecklist([
+      {
+        id: "address",
+        label: "Add mailing address (Settings → Sending)",
+        done: Boolean(profile?.mailing_address?.trim()),
+        href: "/app/settings/sending",
+      },
+      {
+        id: "list",
+        label: "Create or confirm a subscriber list",
+        done: lists.length > 0,
+        href: "/app/subscribers",
+      },
+      {
+        id: "import",
+        label: "Import subscribers",
+        done: (subCount ?? 0) > 0,
+        href: "/app/subscribers",
+      },
+      {
+        id: "campaign",
+        label: "Create a campaign and send a test",
+        done: (campaignCount ?? 0) > 0,
+        href: "/app/campaigns/new",
+      },
+      {
+        id: "analytics",
+        label: "View analytics after sending",
+        done: (sentCount ?? 0) > 0,
+        href: "/app/analytics",
+      },
+    ]);
+
+    if (!profile?.onboarding_completed_at) {
+      setOpen(true);
+    }
+  };
+
   useEffect(() => {
-    // Check if user has seen onboarding
-    if (user) {
-      const hasSeenOnboarding = localStorage.getItem("emailblast_onboarding_complete");
-      if (!hasSeenOnboarding) {
-        // Small delay before showing modal
-        setTimeout(() => setOpen(true), 500);
-      }
+    if (user) refreshChecklist();
+  }, [user?.id]);
+
+  const handleComplete = async () => {
+    if (user?.id) {
+      await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          onboarding_completed_at: new Date().toISOString(),
+        });
     }
-  }, [user]);
-
-  const steps: WelcomeStep[] = [
-    {
-      id: "welcome",
-      title: "Welcome to EmailBlast! 🎉",
-      description: "We're excited to help you grow your business with powerful email marketing. Let's get you started with a quick tour.",
-      icon: <Rocket className="h-12 w-12 text-primary" />,
-    },
-    {
-      id: "subscribers",
-      title: "Import Your Subscribers",
-      description: "Start by adding your contacts. You can import from CSV, add them manually, or use our Lead Finder tool to discover new prospects.",
-      icon: <Users className="h-12 w-12 text-primary" />,
-      action: () => {
-        setOpen(false);
-        navigate("/app/subscribers");
-      },
-      actionLabel: "Import Subscribers",
-    },
-    {
-      id: "campaign",
-      title: "Create Your First Campaign",
-      description: "Design beautiful emails with our intuitive editor. Use AI assistance, choose from templates, or start from scratch.",
-      icon: <Mail className="h-12 w-12 text-primary" />,
-      action: () => {
-        setOpen(false);
-        navigate("/app/campaigns/new");
-      },
-      actionLabel: "Create Campaign",
-    },
-    {
-      id: "analytics",
-      title: "Track Your Success",
-      description: "Monitor opens, clicks, and conversions in real-time. Use insights to optimize your campaigns and grow your audience.",
-      icon: <BarChart className="h-12 w-12 text-primary" />,
-      action: () => {
-        setOpen(false);
-        navigate("/app/analytics");
-      },
-      actionLabel: "View Analytics",
-    },
-  ];
-
-  const handleNext = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      handleComplete();
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleComplete = () => {
-    localStorage.setItem("emailblast_onboarding_complete", "true");
     setOpen(false);
   };
 
-  const handleSkip = () => {
-    localStorage.setItem("emailblast_onboarding_complete", "true");
-    setOpen(false);
-  };
-
-  const progress = ((currentStep + 1) / steps.length) * 100;
-  const currentStepData = steps[currentStep];
+  const completed = checklist.filter((c) => c.done).length;
+  const progress =
+    checklist.length > 0 ? (completed / checklist.length) * 100 : 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
-          <div className="flex items-center justify-center mb-4">
-            {currentStepData.icon}
-          </div>
-          <DialogTitle className="text-2xl text-center">
-            {currentStepData.title}
-          </DialogTitle>
-          <DialogDescription className="text-center text-base">
-            {currentStepData.description}
+          <DialogTitle className="text-2xl">Welcome to EmailBlast</DialogTitle>
+          <DialogDescription>
+            Free beta — complete this checklist to send your first campaign.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 my-4">
-          <Progress value={progress} className="h-2" />
-          <p className="text-sm text-center text-muted-foreground">
-            Step {currentStep + 1} of {steps.length}
+        <div className="space-y-3 my-4">
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            {completed} of {checklist.length} complete
           </p>
+
+          <ul className="space-y-2">
+            {checklist.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate(item.href);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-md border p-3 text-left text-sm hover:bg-muted/50"
+                >
+                  {item.done ? (
+                    <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+                  <span className={item.done ? "text-muted-foreground" : ""}>
+                    {item.label}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {currentStep === 0 && (
-          <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-            <h4 className="font-medium">Quick Start Checklist:</h4>
-            <ul className="space-y-2">
-              <li className="flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4 text-primary" />
-                <span>Import your subscriber list</span>
-              </li>
-              <li className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-primary" />
-                <span>Create and send your first campaign</span>
-              </li>
-              <li className="flex items-center gap-2 text-sm">
-                <BarChart className="h-4 w-4 text-primary" />
-                <span>Monitor performance and optimize</span>
-              </li>
-            </ul>
-          </div>
-        )}
-
-        <DialogFooter className="flex justify-between items-center">
-          <div className="flex-1">
-            {currentStep > 0 && (
-              <Button variant="ghost" onClick={handleBack}>
-                Back
-              </Button>
-            )}
-          </div>
-          
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={handleSkip}>
-              Skip Tour
-            </Button>
-            
-            {currentStepData.action && currentStepData.actionLabel ? (
-              <Button onClick={currentStepData.action}>
-                {currentStepData.actionLabel}
-              </Button>
-            ) : (
-              <Button onClick={handleNext}>
-                {currentStep === steps.length - 1 ? (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Get Started
-                  </>
-                ) : (
-                  "Next"
-                )}
-              </Button>
-            )}
-          </div>
+        <DialogFooter className="flex justify-between gap-2">
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Remind me later
+          </Button>
+          <Button onClick={handleComplete}>Dismiss checklist</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

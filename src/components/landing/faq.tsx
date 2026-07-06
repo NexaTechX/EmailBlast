@@ -3,24 +3,24 @@ import { Plus } from "lucide-react";
 
 const faqs = [
   {
-    q: "Do I need a credit card to start?",
-    a: "No. The free plan lets you import contacts and send your first campaigns with no card. Upgrade only when you're ready to scale.",
+    q: "Is EmailBlast really free right now?",
+    a: "Yes. During the free beta you can create lists, import subscribers, send campaigns, and view analytics at no cost. Paid plans are coming later.",
   },
   {
     q: "How does the AI copywriter work?",
-    a: "Describe your goal and the AI drafts subject lines and full email content in your voice. Refine tone, length, and call-to-action, then edit anything in the visual builder.",
+    a: "Describe your goal in the campaign editor and the AI drafts subject lines and body copy. You can edit everything before sending.",
   },
   {
-    q: "Will my emails actually reach the inbox?",
-    a: "Yes. We handle authentication (SPF, DKIM, DMARC), domain warm-up, and reputation monitoring so you consistently hit 99%+ deliverability.",
+    q: "What do I need to send email?",
+    a: "Verify a domain in Resend, add your sender details and physical mailing address in Settings → Sending, import subscribers to a list, then create and send a campaign.",
   },
   {
     q: "Can I import my existing subscribers?",
-    a: "Upload a CSV and we clean, dedupe, and organize your list automatically — tags and segments included.",
+    a: "Yes. Upload a CSV or paste data on the Subscribers page. Assign imports to a list so campaigns can target them.",
   },
   {
-    q: "Is there a limit on team members?",
-    a: "Paid plans include unlimited teammates with roles and permissions, so your whole team works in one shared workspace.",
+    q: "Are automations and paid plans available?",
+    a: "Not yet. Automations, team seats, and billing are planned after the beta. The app is honest about what works today.",
   },
 ];
 
@@ -38,11 +38,7 @@ export function FAQ() {
             Questions, answered.
           </h2>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-            Can&apos;t find what you&apos;re looking for?{" "}
-            <span className="cursor-pointer text-foreground underline underline-offset-4">
-              Talk to us
-            </span>
-            .
+            Building in public during the free beta.
           </p>
         </div>
 

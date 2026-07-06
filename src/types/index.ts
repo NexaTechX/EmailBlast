@@ -49,7 +49,7 @@ export interface Campaign {
 export interface CampaignAnalytics {
   id: string;
   campaign_id: string;
-  event_type: "open" | "click" | "bounce" | "unsubscribe" | "conversion";
+  event_type: "open" | "click" | "bounce" | "unsubscribe" | "conversion" | "sent";
   occurred_at: string;
   metadata?: Record<string, any>;
   subscriber_id?: string;

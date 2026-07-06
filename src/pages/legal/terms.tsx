@@ -76,19 +76,17 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-xl font-semibold mb-3">5. Subscription Plans</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Some parts of the Service are billed on a subscription basis. You will be billed in advance on a 
-                recurring and periodic basis. Billing cycles are set on a monthly or annual basis, depending on the 
-                subscription plan you select. At the end of each billing cycle, your subscription will automatically 
-                renew unless you cancel it or we cancel it.
+                EmailBlast is currently offered as a free beta. Paid subscription plans, billing cycles, and
+                automatic renewal are not active during beta. When paid plans launch, these terms will be updated
+                before any charges apply.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold mb-3">6. Refund Policy</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We offer a 14-day money-back guarantee for all paid plans. If you're not satisfied with the Service 
-                within the first 14 days of your subscription, you can request a full refund. After the 14-day period, 
-                all charges are non-refundable.
+                Not applicable during the free beta — there are no charges. Refund terms for paid plans will be
+                published before billing goes live.
               </p>
             </section>
 
@@ -164,7 +162,7 @@ export default function TermsOfService() {
               </p>
               <p className="text-muted-foreground leading-relaxed mt-2">
                 Email: support@emailblast.com<br />
-                Address: [Your Business Address]
+                EmailBlast is in free beta — billing terms below do not apply until paid plans launch.
               </p>
             </section>
           </div>

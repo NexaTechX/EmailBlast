@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import DatePickerWithRange from "../ui/date-picker-with-range";
 import { Badge } from "../ui/badge";
 import {
   Tooltip,
@@ -18,6 +17,7 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { InfoIcon, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 import { getSubscriberLists } from "@/lib/api";
 import type { SubscriberList } from "@/types";
 
@@ -135,9 +135,16 @@ const CampaignDetailsForm = ({
                     Loading lists...
                   </SelectItem>
                 ) : subscriberLists.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    No lists available
-                  </SelectItem>
+                  <div className="p-2 text-sm text-muted-foreground">
+                    No lists yet.{" "}
+                    <Link
+                      to="/app/subscribers"
+                      className="text-primary underline"
+                    >
+                      Create a list
+                    </Link>{" "}
+                    and import subscribers first.
+                  </div>
                 ) : (
                   subscriberLists.map((list) => (
                     <SelectItem key={list.id} value={list.id}>
@@ -166,11 +173,14 @@ const CampaignDetailsForm = ({
                 )}
               </SelectContent>
             </Select>
-          </div>
-
-          <div>
-            <Label>Schedule</Label>
-            <DatePickerWithRange />
+            {!loading && subscriberLists.length === 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Campaigns need a subscriber list.{" "}
+                <Link to="/app/subscribers" className="text-primary underline">
+                  Set up your audience
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </form>

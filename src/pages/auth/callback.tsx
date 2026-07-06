@@ -9,7 +9,7 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      const { error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error) {
         toast({
@@ -21,7 +21,16 @@ export default function AuthCallback() {
         return;
       }
 
-      // Successfully authenticated
+      if (!session) {
+        toast({
+          variant: "destructive",
+          title: "Authentication failed",
+          description: "No active session found. Please sign in again.",
+        });
+        navigate("/auth");
+        return;
+      }
+
       toast({
         title: "Email verified",
         description: "Your email has been verified successfully",
