@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Card } from "../ui/card";
-import { Clock, Save, Send, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Clock, Save, Send, CheckCircle2, ArrowLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,12 +10,13 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogDescription,
-} from "../ui/dialog";
-import { Label } from "../ui/label";
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { sendTestEmail } from "@/lib/resend";
-import { useToast } from "../ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { analyzeCompliance } from "@/lib/compliance";
+import { Link } from "react-router-dom";
 
 interface CampaignHeaderProps {
   title?: string;
@@ -24,7 +24,16 @@ interface CampaignHeaderProps {
   onSaveDraft?: () => void;
   onSchedule?: (scheduledFor: string) => void;
   onSend?: () => void;
-  campaign?: any;
+  campaign?: {
+    title: string;
+    content: string;
+    details: {
+      subject: string;
+      senderName: string;
+      senderEmail: string;
+      subscriberList: string;
+    };
+  };
   saving?: boolean;
 }
 
@@ -51,6 +60,10 @@ const CampaignHeader = ({
   const { toast } = useToast();
 
   useEffect(() => {
+    setEditedTitle(title);
+  }, [title]);
+
+  useEffect(() => {
     supabase
       .from("profiles")
       .select("mailing_address")
@@ -60,31 +73,16 @@ const CampaignHeader = ({
       });
   }, []);
 
-  const handleTitleClick = () => {
-    setIsEditing(true);
-    setEditedTitle(title);
-  };
-
-  const handleTitleBlur = () => {
+  const commitTitle = () => {
     setIsEditing(false);
     if (editedTitle.trim() !== "") {
-      onTitleChange(editedTitle);
+      onTitleChange(editedTitle.trim());
     } else {
       setEditedTitle(title);
     }
   };
 
-  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleTitleBlur();
-    } else if (e.key === "Escape") {
-      setIsEditing(false);
-      setEditedTitle(title);
-    }
-  };
-
   const handleScheduleSubmit = () => {
-    // Combine date and time for scheduling
     const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
     onSchedule(scheduledDateTime.toISOString());
     setShowScheduleDialog(false);
@@ -93,8 +91,8 @@ const CampaignHeader = ({
   const handleSendTest = async () => {
     if (!campaign || !testEmail) {
       toast({
-        title: "Error",
-        description: "Please enter a valid email address",
+        title: "Email required",
+        description: "Enter a valid address for the test send.",
         variant: "destructive",
       });
       return;
@@ -117,10 +115,9 @@ const CampaignHeader = ({
         },
         testEmail,
       );
-
       toast({
-        title: "Test Email Sent",
-        description: `A test email has been sent to ${testEmail}`,
+        title: "Test sent",
+        description: `Sent to ${testEmail}`,
       });
       setShowTestDialog(false);
       setTestEmail("");
@@ -128,7 +125,7 @@ const CampaignHeader = ({
       console.error("Error sending test email:", error);
       toast({
         title: "Error",
-        description: "Failed to send test email. Please try again.",
+        description: "Failed to send test email.",
         variant: "destructive",
       });
     } finally {
@@ -137,11 +134,10 @@ const CampaignHeader = ({
   };
 
   const handleSendNow = async () => {
-    if (!campaign || !campaign.details.subscriberList) {
+    if (!campaign?.details.subscriberList) {
       toast({
-        title: "Error",
-        description:
-          "Campaign details are incomplete. Please select a subscriber list.",
+        title: "Audience required",
+        description: "Select a subscriber list before sending.",
         variant: "destructive",
       });
       return;
@@ -158,7 +154,7 @@ const CampaignHeader = ({
       console.error("Error sending campaign:", error);
       toast({
         title: "Error",
-        description: "Failed to send campaign. Please try again.",
+        description: "Failed to send campaign.",
         variant: "destructive",
       });
     } finally {
@@ -167,67 +163,104 @@ const CampaignHeader = ({
   };
 
   const compliance = campaign
-    ? analyzeCompliance(campaign.content || "", campaign.details?.subject || "")
+    ? analyzeCompliance(
+        campaign.content || "",
+        campaign.details?.subject || "",
+      )
     : { score: 0, checks: [] };
   const hasList = Boolean(campaign?.details?.subscriberList);
-  const canSend = hasList && mailingAddressSet && compliance.score >= 50;
+  const hasSubject = Boolean(campaign?.details?.subject?.trim());
+  const hasBody = Boolean(
+    campaign?.content &&
+      campaign.content.replace(/<[^>]+>/g, "").trim().length > 0,
+  );
+  const canSend =
+    hasList &&
+    mailingAddressSet &&
+    hasSubject &&
+    hasBody &&
+    compliance.score >= 50;
 
   return (
-    <Card className="w-full bg-white p-4 border-b">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex-1 max-w-md min-w-0">
-          {isEditing ? (
-            <Input
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              onBlur={handleTitleBlur}
-              onKeyDown={handleTitleKeyDown}
-              className="text-lg font-semibold border-primary"
-              autoFocus
-            />
-          ) : (
-            <h1
-              className="text-lg font-semibold cursor-pointer hover:text-primary"
-              onClick={handleTitleClick}
-            >
-              {title}
-            </h1>
-          )}
+    <header className="shrink-0 border-b border-border bg-background">
+      <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            asChild
+          >
+            <Link to="/app/campaigns" aria-label="Back to campaigns">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1 max-w-md">
+            {isEditing ? (
+              <Input
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={commitTitle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitTitle();
+                  if (e.key === "Escape") {
+                    setIsEditing(false);
+                    setEditedTitle(title);
+                  }
+                }}
+                className="h-8 border-border text-sm font-semibold"
+                autoFocus
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(true);
+                  setEditedTitle(title);
+                }}
+                className="block w-full truncate text-left text-sm font-semibold tracking-tight hover:text-foreground/80"
+                title="Click to rename"
+              >
+                {title}
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Button
             variant="outline"
+            size="sm"
             onClick={onSaveDraft}
-            className="flex items-center gap-2"
             disabled={saving}
-            aria-label="Save draft"
+            className="h-8"
           >
-            <Save className="h-4 w-4" />
-            <span className="hidden xs:inline">{saving ? "Saving..." : "Save Draft"}</span>
+            <Save className="mr-1.5 h-3.5 w-3.5" />
+            {saving ? "Saving…" : "Save"}
           </Button>
 
           <Dialog open={showTestDialog} onOpenChange={setShowTestDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2" aria-label="Send test email">
-                <span className="sm:hidden">Test</span>
-                <span className="hidden sm:inline">Send Test</span>
+              <Button variant="outline" size="sm" className="h-8">
+                Test
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Send Test Email</DialogTitle>
+                <DialogTitle>Send test email</DialogTitle>
+                <DialogDescription>
+                  Delivers a single copy with no list tracking.
+                </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="test-email">Email Address</Label>
-                  <Input
-                    id="test-email"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={testEmail}
-                    onChange={(e) => setTestEmail(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="test-email">Email address</Label>
+                <Input
+                  id="test-email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                />
               </div>
               <DialogFooter>
                 <Button
@@ -240,7 +273,7 @@ const CampaignHeader = ({
                   onClick={handleSendTest}
                   disabled={!testEmail || isSendingTest}
                 >
-                  {isSendingTest ? "Sending..." : "Send Test"}
+                  {isSendingTest ? "Sending…" : "Send test"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -251,17 +284,17 @@ const CampaignHeader = ({
             onOpenChange={setShowScheduleDialog}
           >
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2" aria-label="Schedule campaign">
-                <Clock className="h-4 w-4" />
-                <span className="hidden sm:inline">Schedule</span>
+              <Button variant="outline" size="sm" className="h-8">
+                <Clock className="mr-1.5 h-3.5 w-3.5" />
+                Schedule
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Schedule Campaign</DialogTitle>
+                <DialogTitle>Schedule campaign</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
+              <div className="grid gap-4 py-2">
+                <div className="space-y-2">
                   <Label htmlFor="schedule-date">Date</Label>
                   <Input
                     id="schedule-date"
@@ -271,7 +304,7 @@ const CampaignHeader = ({
                     min={new Date().toISOString().split("T")[0]}
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="schedule-time">Time</Label>
                   <Input
                     id="schedule-time"
@@ -292,21 +325,20 @@ const CampaignHeader = ({
                   onClick={handleScheduleSubmit}
                   disabled={!scheduleDate || !scheduleTime}
                 >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Schedule Campaign
+                  Schedule
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
           <Button
+            size="sm"
             onClick={handleSendNow}
             disabled={isSending}
-            className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-            aria-label="Send campaign now"
+            className="h-8 bg-signal text-white hover:bg-signal/90"
           >
-            <Send className="h-4 w-4" />
-            {isSending ? "Sending..." : "Send Now"}
+            <Send className="mr-1.5 h-3.5 w-3.5" />
+            {isSending ? "Sending…" : "Send"}
           </Button>
         </div>
       </div>
@@ -314,36 +346,56 @@ const CampaignHeader = ({
       <Dialog open={showPreSendDialog} onOpenChange={setShowPreSendDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Pre-send checklist</DialogTitle>
+            <DialogTitle>Ready to send?</DialogTitle>
             <DialogDescription>
-              Confirm these items before sending to your list.
+              Confirm these items before delivering to your list.
             </DialogDescription>
           </DialogHeader>
-          <ul className="space-y-2 text-sm py-2">
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className={`h-4 w-4 ${hasList ? "text-emerald-600" : "text-muted-foreground"}`} />
-              Subscriber list selected
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className={`h-4 w-4 ${mailingAddressSet ? "text-emerald-600" : "text-muted-foreground"}`} />
-              Physical mailing address in Settings → Sending
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className={`h-4 w-4 ${compliance.score >= 50 ? "text-emerald-600" : "text-muted-foreground"}`} />
-              Compliance score: {compliance.score}/100
+          <ul className="space-y-2 py-2 text-sm">
+            {[
+              { ok: hasSubject, label: "Subject line filled" },
+              { ok: hasBody, label: "Email body has content" },
+              { ok: hasList, label: "Subscriber list selected" },
+              {
+                ok: mailingAddressSet,
+                label: "Mailing address in Settings → Sending",
+              },
+              {
+                ok: compliance.score >= 50,
+                label: `Compliance score ${compliance.score}/100`,
+              },
+            ].map((item) => (
+              <li key={item.label} className="flex items-center gap-2">
+                <CheckCircle2
+                  className={`h-4 w-4 shrink-0 ${
+                    item.ok ? "text-signal" : "text-muted-foreground/40"
+                  }`}
+                />
+                {item.label}
+              </li>
+            ))}
+            <li className="pt-1 text-xs text-muted-foreground">
+              Free plan: 100 emails/month enforced server-side.
             </li>
           </ul>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPreSendDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowPreSendDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={confirmSend} disabled={!canSend}>
+            <Button
+              onClick={confirmSend}
+              disabled={!canSend}
+              className="bg-signal text-white hover:bg-signal/90"
+            >
               Send to list
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </header>
   );
 };
 

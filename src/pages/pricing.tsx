@@ -6,6 +6,8 @@ import { SiteFooter } from "@/components/landing/site-footer";
 import { useAuth } from "@/lib/auth";
 
 const betaFeatures = [
+  "Up to 200 subscribers",
+  "100 emails per month",
   "Unlimited campaigns during beta",
   "Subscriber lists + CSV import",
   "Rich text campaign editor",
@@ -35,8 +37,8 @@ export default function PricingPage() {
               Free while we&apos;re in beta.
             </h1>
             <p className="mx-auto mt-5 max-w-lg text-lg text-muted-foreground">
-              Use EmailBlast at no cost during early access. Paid plans and usage
-              limits will come after we validate the product with real senders.
+              Use EmailBlast at no cost during early access. Free tier includes up
+              to 200 subscribers and 100 emails per month.
             </p>
           </div>
         </section>
@@ -70,8 +72,8 @@ export default function PricingPage() {
           <div className="mt-10 rounded-lg border border-dashed p-6 text-center">
             <p className="font-medium">Pro & Enterprise — coming soon</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Higher volume, team seats, automations, and billing will launch after
-              the beta. Nothing to buy today.
+              Higher volume, team seats, and billing will launch after the beta.
+              Welcome drip automations are available now under Automations.
             </p>
           </div>
         </section>

@@ -29,45 +29,65 @@ export async function enhanceContent(
   return data.content;
 }
 
-export async function generateLeads(
-  query: string,
-  count: number = 5,
+export type ScrapedLeadSource = {
+  sourceUrl: string;
+  markdown?: string;
+  json?: unknown;
+};
+
+/** Format scraped page text into Lead objects — never invents contacts. */
+export async function formatLeads(
+  sources: ScrapedLeadSource[],
 ): Promise<Lead[]> {
-  try {
-    const { leads } = await callAi<{ leads: Lead[] }>({
-      action: "generate_leads",
-      query,
-      count,
-    });
-    return leads;
-  } catch (error) {
-    console.error("Error generating leads:", error);
-    return [];
-  }
+  const { leads } = await callAi<{ leads: Lead[] }>({
+    action: "format_leads",
+    sources,
+  });
+  return Array.isArray(leads) ? leads : [];
 }
 
-export async function generateDomainLeads(domains: string[]): Promise<Lead[]> {
-  try {
-    const { leads } = await callAi<{ leads: Lead[] }>({
-      action: "generate_domain_leads",
-      domains,
-    });
-    return leads;
-  } catch (error) {
-    console.error("Error generating domain leads:", error);
-    return [];
-  }
+export type SubjectSuggestion = { subject: string; preview: string };
+
+export async function suggestSubjects(input: {
+  content: string;
+  subject?: string;
+  tone?: string;
+}): Promise<SubjectSuggestion[]> {
+  const { subjects } = await callAi<{
+    subjects: Array<{ subject?: string; preview?: string }>;
+  }>({
+    action: "suggest_subjects",
+    content: input.content,
+    subject: input.subject,
+    tone: input.tone,
+  });
+  return (subjects || [])
+    .filter((s) => s.subject?.trim())
+    .map((s) => ({
+      subject: String(s.subject).trim(),
+      preview: String(s.preview || "").trim(),
+    }));
 }
 
-export async function enrichLeads(leads: Lead[]): Promise<Lead[]> {
-  try {
-    const { leads: enriched } = await callAi<{ leads: Lead[] }>({
-      action: "enrich_leads",
-      leads,
-    });
-    return enriched;
-  } catch (error) {
-    console.error("Error enriching leads:", error);
-    return leads;
-  }
+export async function insertPersonalization(content: string): Promise<string> {
+  const { content: html } = await callAi<{ content: string }>({
+    action: "insert_personalization",
+    content,
+  });
+  return html;
+}
+
+export async function summarizeCampaign(input: {
+  subject?: string;
+  metrics: Record<string, number | string>;
+}): Promise<{ summary: string; nextSteps: string[] }> {
+  const data = await callAi<{ summary?: string; nextSteps?: string[] }>({
+    action: "summarize_campaign",
+    subject: input.subject,
+    metrics: input.metrics,
+  });
+  return {
+    summary: data.summary || "",
+    nextSteps: Array.isArray(data.nextSteps) ? data.nextSteps : [],
+  };
 }

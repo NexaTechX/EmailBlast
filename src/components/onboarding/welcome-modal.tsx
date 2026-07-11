@@ -32,7 +32,7 @@ export function WelcomeModal() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("mailing_address, onboarding_completed_at")
+      .select("mailing_address, default_sender_email, onboarding_completed_at")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -57,6 +57,12 @@ export function WelcomeModal() {
       .eq("event_type", "sent");
 
     setChecklist([
+      {
+        id: "domain",
+        label: "Set reply-to email (Settings → Sending)",
+        done: Boolean(profile?.default_sender_email?.trim()),
+        href: "/app/settings/sending",
+      },
       {
         id: "address",
         label: "Add mailing address (Settings → Sending)",

@@ -76,7 +76,7 @@ export function PreferencesSettings() {
             <div className="space-y-0.5">
               <Label htmlFor="emailNotifications">Email Notifications</Label>
               <p className="text-sm text-muted-foreground">
-                Receive notifications about your campaigns
+                Get a receipt when a campaign finishes sending
               </p>
             </div>
             <Switch
@@ -92,7 +92,7 @@ export function PreferencesSettings() {
             <div className="space-y-0.5">
               <Label htmlFor="marketingEmails">Marketing Emails</Label>
               <p className="text-sm text-muted-foreground">
-                Receive updates about new features and promotions
+                Preference saved for future product emails (not sent yet)
               </p>
             </div>
             <Switch
@@ -108,7 +108,7 @@ export function PreferencesSettings() {
             <div className="space-y-0.5">
               <Label htmlFor="weeklyDigest">Weekly Digest</Label>
               <p className="text-sm text-muted-foreground">
-                Receive a weekly summary of your campaign performance
+                Preference saved for a future weekly summary (not sent yet)
               </p>
             </div>
             <Switch

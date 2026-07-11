@@ -4,11 +4,21 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import UnderlineExtension from "@tiptap/extension-underline";
-import { Card } from "../ui/card";
-import { Button } from "../ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Badge } from "../ui/badge";
-import { useToast } from "../ui/use-toast";
+import Placeholder from "@tiptap/extension-placeholder";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Bold,
   Italic,
@@ -20,385 +30,319 @@ import {
   ListOrdered,
   Link as LinkIcon,
   Image as ImageIcon,
-  Code,
   Undo,
   Redo,
-  Heading1,
   Heading2,
   Heading3,
-  Pilcrow,
-  Type,
-  FileCode,
-  Eye,
-  Copy,
-  Check,
-  Sparkles,
+  Unlink,
+  Braces,
 } from "lucide-react";
-import { Separator } from "../ui/separator";
-import { useState, useEffect } from "react";
-import { generateContent } from "@/lib/groq-api";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { MERGE_TAGS } from "@/lib/merge-tags";
+import {
+  ImageInsertDialog,
+  LinkInsertDialog,
+} from "./editor-insert-dialogs";
 
 interface RichTextEditorProps {
   content?: string;
   onChange?: (content: string) => void;
+  className?: string;
+}
+
+function ToolBtn({
+  label,
+  active,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={disabled}
+          onClick={onClick}
+          aria-label={label}
+          className={cn(
+            "h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground",
+            active && "bg-muted text-foreground",
+          )}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="text-xs">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 const RichTextEditor = ({
-  content = "<p>Start composing your email campaign...</p>",
+  content = "",
   onChange = () => {},
+  className,
 }: RichTextEditorProps) => {
-  const [viewMode, setViewMode] = useState<"edit" | "preview" | "code">("edit");
-  const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
+  const [linkInitial, setLinkInitial] = useState("");
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        heading: { levels: [2, 3] },
+      }),
       UnderlineExtension,
-      Image,
+      Placeholder.configure({
+        placeholder: "Write the email body…",
+      }),
+      Image.configure({
+        HTMLAttributes: {
+          class: "email-editor-image",
+        },
+      }),
       Link.configure({
         openOnClick: false,
+        HTMLAttributes: {
+          class: "email-editor-link",
+        },
       }),
       TextAlign.configure({
-        types: ['heading', 'paragraph'],
+        types: ["heading", "paragraph"],
       }),
     ],
-    content,
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+    content:
+      content ||
+      "<p></p>",
+    editorProps: {
+      attributes: {
+        class: "email-editor-prose focus:outline-none min-h-[280px]",
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      onChange(ed.getHTML());
     },
   });
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content, false);
+    if (!editor) return;
+    const current = editor.getHTML();
+    if (content !== current) {
+      editor.commands.setContent(content || "<p></p>", false);
     }
   }, [content, editor]);
 
-  const addImage = () => {
-    const url = window.prompt(
-      "Enter image URL",
-      "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
-    );
-    if (url && editor) {
-      editor.chain().focus().setImage({ src: url, alt: "Email image" }).run();
-    }
-  };
-
-  const addLink = () => {
-    const url = window.prompt("Enter URL");
-    if (url && editor) {
-      editor.chain().focus().setLink({ href: url }).run();
-    }
-  };
-
-  const copyToClipboard = () => {
-    if (editor) {
-      navigator.clipboard.writeText(editor.getHTML());
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      toast({
-        title: "Copied to clipboard",
-        description: "HTML content has been copied to clipboard",
-      });
-    }
-  };
-
-  const generateAIContent = async () => {
-    // Open a prompt dialog for the user to provide instructions
-    const userPrompt = window.prompt(
-      "What kind of email content would you like to create? (e.g., welcome email, product announcement, newsletter)",
-      "Create a welcome email for new subscribers",
-    );
-
-    if (!userPrompt) return;
-
-    toast({
-      title: "Generating Content",
-      description: "AI is creating content based on your instructions...",
-    });
-
-    try {
-      // Generate content via our server-side AI (Groq) — no key in the browser
-      const generatedContent = await generateContent(userPrompt);
-
-      if (editor) {
-        editor.commands.setContent(generatedContent.trim());
-        onChange(generatedContent.trim());
-
-        toast({
-          title: "AI Content Generated",
-          description: "Content has been created based on your instructions.",
-        });
-      }
-    } catch (error) {
-      console.error("AI content generation error:", error);
-
-      // Fallback to local generation if API fails
-      if (editor) {
-        // Generate content based on the prompt
-        let generatedContent = "";
-
-        if (userPrompt.toLowerCase().includes("welcome")) {
-          generatedContent = `
-            <h2>Welcome to Our Community!</h2>
-            <p>Dear Subscriber,</p>
-            <p>We're thrilled to have you join us. Thank you for subscribing to our newsletter!</p>
-            <p>Here's what you can expect from us:</p>
-            <ul>
-              <li>Weekly updates on industry trends</li>
-              <li>Exclusive content just for subscribers</li>
-              <li>Special offers and early access to new features</li>
-            </ul>
-            <p>If you have any questions, feel free to reply to this email.</p>
-            <p>Best regards,<br>The Team</p>
-          `;
-        } else if (userPrompt.toLowerCase().includes("product")) {
-          generatedContent = `
-            <h2>Introducing Our New Product!</h2>
-            <p>Dear Valued Customer,</p>
-            <p>We're excited to announce the launch of our latest product that will transform how you work.</p>
-            <h3>Key Features:</h3>
-            <ul>
-              <li><strong>Streamlined Workflow</strong> - Save time with our intuitive interface</li>
-              <li><strong>Advanced Analytics</strong> - Gain deeper insights into your performance</li>
-              <li><strong>Seamless Integration</strong> - Works with all your favorite tools</li>
-            </ul>
-            <p><a href="#">Click here</a> to learn more and get an exclusive early-bird discount!</p>
-            <p>Warm regards,<br>The Product Team</p>
-          `;
-        } else if (userPrompt.toLowerCase().includes("newsletter")) {
-          generatedContent = `
-            <h2>This Month's Newsletter</h2>
-            <p>Dear Subscriber,</p>
-            <p>We hope this newsletter finds you well. Here's what we've been working on this month:</p>
-            <h3>Highlights:</h3>
-            <ul>
-              <li>Our annual conference was a huge success with over 1,000 attendees</li>
-              <li>We've released version 2.0 of our platform with exciting new features</li>
-              <li>Our community has grown to over 10,000 members worldwide</li>
-            </ul>
-            <p>Check out our <a href="#">blog</a> for more detailed updates and stories.</p>
-            <p>Until next month,<br>The Newsletter Team</p>
-          `;
-        } else {
-          generatedContent = `
-            <h2>${userPrompt.split(" ").slice(0, 3).join(" ")}...</h2>
-            <p>Dear Subscriber,</p>
-            <p>Thank you for your continued support. We have some exciting news to share with you.</p>
-            <p>${userPrompt}</p>
-            <p>We hope you find this information valuable. Please don't hesitate to reach out if you have any questions.</p>
-            <p>Best regards,<br>The Team</p>
-          `;
-        }
-
-        editor.commands.setContent(generatedContent.trim());
-        onChange(generatedContent.trim());
-
-        toast({
-          title: "AI Content Generated (fallback)",
-          description:
-            "Content has been created based on your instructions using local generation.",
-        });
-      }
-    }
-  };
-
   if (!editor) return null;
 
+  const openLinkDialog = () => {
+    const prev = editor.getAttributes("link").href as string | undefined;
+    setLinkInitial(prev || "https://");
+    setLinkOpen(true);
+  };
+
   return (
-    <Card className="w-full h-full bg-background">
-      <div className="flex items-center justify-between p-2 border-b">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editor.chain().focus().undo().run()}
+    <TooltipProvider delayDuration={200}>
+      <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}>
+        <div className="flex flex-wrap items-center gap-0.5 border-b border-border bg-background/80 px-2 py-1.5 backdrop-blur-sm">
+          <ToolBtn
+            label="Undo"
             disabled={!editor.can().undo()}
+            onClick={() => editor.chain().focus().undo().run()}
           >
             <Undo className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editor.chain().focus().redo().run()}
+          </ToolBtn>
+          <ToolBtn
+            label="Redo"
             disabled={!editor.can().redo()}
+            onClick={() => editor.chain().focus().redo().run()}
           >
             <Redo className="h-4 w-4" />
-          </Button>
-          <Separator orientation="vertical" className="mx-2 h-6" />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={editor.isActive("bold") ? "bg-muted" : ""}
-          >
-            <Bold className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={editor.isActive("italic") ? "bg-muted" : ""}
-          >
-            <Italic className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            className={editor.isActive("underline") ? "bg-muted" : ""}
-          >
-            <Underline className="h-4 w-4" />
-          </Button>
-          <Separator orientation="vertical" className="mx-2 h-6" />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 1 }).run()
-            }
-            className={
-              editor.isActive("heading", { level: 1 }) ? "bg-muted" : ""
-            }
-          >
-            <Heading1 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </ToolBtn>
+
+          <Separator orientation="vertical" className="mx-1 h-5" />
+
+          <ToolBtn
+            label="Heading"
+            active={editor.isActive("heading", { level: 2 })}
             onClick={() =>
               editor.chain().focus().toggleHeading({ level: 2 }).run()
             }
-            className={
-              editor.isActive("heading", { level: 2 }) ? "bg-muted" : ""
-            }
           >
             <Heading2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </ToolBtn>
+          <ToolBtn
+            label="Subheading"
+            active={editor.isActive("heading", { level: 3 })}
             onClick={() =>
               editor.chain().focus().toggleHeading({ level: 3 }).run()
             }
-            className={
-              editor.isActive("heading", { level: 3 }) ? "bg-muted" : ""
-            }
           >
             <Heading3 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editor.chain().focus().setParagraph().run()}
-            className={editor.isActive("paragraph") ? "bg-muted" : ""}
+          </ToolBtn>
+
+          <Separator orientation="vertical" className="mx-1 h-5" />
+
+          <ToolBtn
+            label="Bold"
+            active={editor.isActive("bold")}
+            onClick={() => editor.chain().focus().toggleBold().run()}
           >
-            <Pilcrow className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={generateAIContent}>
-            <Sparkles className="h-4 w-4 mr-2" />
-            AI Enhance
-          </Button>
-          <Button variant="ghost" size="icon" onClick={copyToClipboard}>
-            {copied ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
+            <Bold className="h-4 w-4" />
+          </ToolBtn>
+          <ToolBtn
+            label="Italic"
+            active={editor.isActive("italic")}
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+          >
+            <Italic className="h-4 w-4" />
+          </ToolBtn>
+          <ToolBtn
+            label="Underline"
+            active={editor.isActive("underline")}
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+          >
+            <Underline className="h-4 w-4" />
+          </ToolBtn>
 
-      <div className="flex items-center gap-2 p-2 border-b">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => editor.chain().focus().setTextAlign("left").run()}
-          className={editor.isActive({ textAlign: "left" }) ? "bg-muted" : ""}
-        >
-          <AlignLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => editor.chain().focus().setTextAlign("center").run()}
-          className={editor.isActive({ textAlign: "center" }) ? "bg-muted" : ""}
-        >
-          <AlignCenter className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => editor.chain().focus().setTextAlign("right").run()}
-          className={editor.isActive({ textAlign: "right" }) ? "bg-muted" : ""}
-        >
-          <AlignRight className="h-4 w-4" />
-        </Button>
-        <Separator orientation="vertical" className="mx-2 h-6" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive("bulletList") ? "bg-muted" : ""}
-        >
-          <List className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={editor.isActive("orderedList") ? "bg-muted" : ""}
-        >
-          <ListOrdered className="h-4 w-4" />
-        </Button>
-        <Separator orientation="vertical" className="mx-2 h-6" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={addLink}
-          className={editor.isActive("link") ? "bg-muted" : ""}
-        >
-          <LinkIcon className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={addImage}>
-          <ImageIcon className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={editor.isActive("codeBlock") ? "bg-muted" : ""}
-        >
-          <Code className="h-4 w-4" />
-        </Button>
-      </div>
+          <Separator orientation="vertical" className="mx-1 h-5" />
 
-      <div className="flex flex-col h-[calc(100%-96px)]">
-        <div className="p-4 min-h-[500px] prose prose-sm max-w-none flex-grow overflow-auto">
-          <EditorContent editor={editor} />
+          <ToolBtn
+            label="Align left"
+            active={editor.isActive({ textAlign: "left" })}
+            onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          >
+            <AlignLeft className="h-4 w-4" />
+          </ToolBtn>
+          <ToolBtn
+            label="Align center"
+            active={editor.isActive({ textAlign: "center" })}
+            onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          >
+            <AlignCenter className="h-4 w-4" />
+          </ToolBtn>
+          <ToolBtn
+            label="Align right"
+            active={editor.isActive({ textAlign: "right" })}
+            onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          >
+            <AlignRight className="h-4 w-4" />
+          </ToolBtn>
+
+          <Separator orientation="vertical" className="mx-1 h-5" />
+
+          <ToolBtn
+            label="Bullet list"
+            active={editor.isActive("bulletList")}
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+          >
+            <List className="h-4 w-4" />
+          </ToolBtn>
+          <ToolBtn
+            label="Numbered list"
+            active={editor.isActive("orderedList")}
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          >
+            <ListOrdered className="h-4 w-4" />
+          </ToolBtn>
+
+          <Separator orientation="vertical" className="mx-1 h-5" />
+
+          <ToolBtn
+            label="Link"
+            active={editor.isActive("link")}
+            onClick={openLinkDialog}
+          >
+            <LinkIcon className="h-4 w-4" />
+          </ToolBtn>
+          {editor.isActive("link") && (
+            <ToolBtn
+              label="Remove link"
+              onClick={() => editor.chain().focus().unsetLink().run()}
+            >
+              <Unlink className="h-4 w-4" />
+            </ToolBtn>
+          )}
+          <ToolBtn label="Image" onClick={() => setImageOpen(true)}>
+            <ImageIcon className="h-4 w-4" />
+          </ToolBtn>
+
+          <Separator orientation="vertical" className="mx-1 h-5" />
+
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    <Braces className="h-3.5 w-3.5" />
+                    Merge tags
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Insert personalization fields
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-48">
+              {MERGE_TAGS.map((t) => (
+                <DropdownMenuItem
+                  key={t.tag}
+                  onClick={() =>
+                    editor.chain().focus().insertContent(t.tag).run()
+                  }
+                  className="font-mono text-xs"
+                >
+                  <span className="text-muted-foreground">{t.label}</span>
+                  <span className="ml-auto text-foreground">{t.tag}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        <div className="p-2 border-t flex justify-between items-center bg-muted/20">
-          <div className="text-xs text-muted-foreground">
-            <span>
-              💡 Tip: Use the AI Assistant for help creating professional email
-              content
-            </span>
+        <div className="email-editor-canvas min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="email-editor-sheet mx-auto w-full max-w-[920px] px-4 py-5 sm:px-8 sm:py-7 lg:max-w-[1040px]">
+            <EditorContent editor={editor} />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={addImage}>
-              <ImageIcon className="h-4 w-4 mr-2" /> Add Image
-            </Button>
-            <Button variant="outline" size="sm" onClick={addLink}>
-              <LinkIcon className="h-4 w-4 mr-2" /> Add Link
-            </Button>
-          </div>
         </div>
+
+        <LinkInsertDialog
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+          initialUrl={linkInitial}
+          onConfirm={(url) => {
+            editor
+              .chain()
+              .focus()
+              .extendMarkRange("link")
+              .setLink({ href: url })
+              .run();
+          }}
+        />
+        <ImageInsertDialog
+          open={imageOpen}
+          onOpenChange={setImageOpen}
+          onConfirm={(src, alt) => {
+            editor.chain().focus().setImage({ src, alt }).run();
+          }}
+        />
       </div>
-    </Card>
+    </TooltipProvider>
   );
 };
 

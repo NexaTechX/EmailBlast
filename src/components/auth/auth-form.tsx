@@ -82,7 +82,7 @@ export function AuthForm() {
     try {
       if (mode === "login") {
         await signIn(email, password);
-        navigate("/app");
+        navigate("/app", { replace: true });
       } else {
         const validation = signUpSchema.safeParse({
           email,
@@ -105,7 +105,7 @@ export function AuthForm() {
         if (needsVerification) {
           setPendingEmail(email);
         } else {
-          navigate("/app");
+          navigate("/app", { replace: true });
         }
       }
     } catch (error) {
@@ -132,7 +132,7 @@ export function AuthForm() {
       );
       if (hasSession) {
         toast({ title: "Email verified", description: "Welcome to EmailBlast." });
-        navigate("/app");
+        navigate("/app", { replace: true });
       } else {
         toast({
           title: "Email verified",

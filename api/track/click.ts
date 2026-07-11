@@ -37,8 +37,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (cid && email && tokenValid(token, cid, email)) {
     try {
-      await sql`insert into campaign_analytics (campaign_id, email, event_type)
-                values (${cid}, ${email}, 'click')`;
+      const existing = await sql`
+        select id from campaign_analytics
+        where campaign_id = ${cid}
+          and lower(email) = lower(${email})
+          and event_type = 'click'
+          and metadata->>'url' = ${destination}
+        limit 1
+      `;
+      if (existing.length === 0) {
+        const meta = JSON.stringify({ url: destination, source: "pixel" });
+        await sql`insert into campaign_analytics (campaign_id, email, event_type, metadata)
+                  values (${cid}, ${email}, 'click', ${meta}::jsonb)`;
+      }
     } catch (err) {
       console.error("track click error", err);
     }

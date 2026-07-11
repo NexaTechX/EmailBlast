@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { ExternalLink, Mail, MapPin } from "lucide-react";
+import { Mail, MapPin } from "lucide-react";
 
 function Field({
   label,
@@ -27,7 +27,7 @@ function Field({
   );
 }
 
-const RESEND_DOMAIN = import.meta.env.VITE_RESEND_FROM_DOMAIN as
+const FROM_DOMAIN = import.meta.env.VITE_RESEND_FROM_DOMAIN as
   | string
   | undefined;
 
@@ -66,13 +66,6 @@ export function SendingSettings() {
   useEffect(() => {
     if (user?.id) loadProfile();
   }, [user?.id]);
-
-  const domainMismatch =
-    RESEND_DOMAIN &&
-    profile.default_sender_email &&
-    !profile.default_sender_email
-      .toLowerCase()
-      .endsWith(`@${RESEND_DOMAIN.toLowerCase()}`);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,8 +107,9 @@ export function SendingSettings() {
       <div>
         <h3 className="text-lg font-semibold tracking-tight">Sending setup</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Configure your sender identity and CAN-SPAM mailing address. These
-          values are injected into every campaign footer.
+          Configure how your brand appears on campaigns and your CAN-SPAM
+          mailing address. EmailBlast handles delivery on our verified domain —
+          you do not need a Resend account or DNS setup.
         </p>
       </div>
 
@@ -123,21 +117,24 @@ export function SendingSettings() {
         <div className="flex items-start gap-3">
           <Mail className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <div className="space-y-2 text-sm">
-            <p className="font-medium">Verify your domain in Resend</p>
-            <p className="text-muted-foreground">
-              Emails must be sent from an address on a domain you have verified
-              in Resend. Add DNS records in your Resend dashboard, then use a
-              matching sender email below.
-            </p>
-            <a
-              href="https://resend.com/docs/dashboard/domains/introduction"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary hover:underline"
-            >
-              Resend domain verification docs
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+            <p className="font-medium">How sending works</p>
+            <ul className="list-disc pl-4 text-muted-foreground space-y-1">
+              <li>
+                Campaigns are sent from EmailBlast’s verified domain
+                {FROM_DOMAIN ? ` (@${FROM_DOMAIN})` : ""}.
+              </li>
+              <li>
+                Your sender name is shown as the From display name recipients
+                see.
+              </li>
+              <li>
+                Your reply-to email is where subscriber replies are delivered.
+              </li>
+              <li>
+                Your physical mailing address is required and injected into
+                every email footer.
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -146,7 +143,7 @@ export function SendingSettings() {
         <div className="space-y-5 p-6">
           <Field
             label="Default sender name"
-            hint="Shown in the From field of your campaigns."
+            hint="Shown as the From display name on your campaigns."
           >
             <Input
               value={profile.default_sender_name}
@@ -159,12 +156,8 @@ export function SendingSettings() {
           </Field>
 
           <Field
-            label="Default sender email"
-            hint={
-              RESEND_DOMAIN
-                ? `Must use your verified domain: @${RESEND_DOMAIN}`
-                : "Use an email on a domain verified in Resend."
-            }
+            label="Reply-to email"
+            hint="Where replies from subscribers should go. This is not the From address used for delivery."
           >
             <Input
               type="email"
@@ -178,13 +171,6 @@ export function SendingSettings() {
               placeholder="hello@yourdomain.com"
               className="h-11"
             />
-            {domainMismatch && (
-              <p className="text-xs text-amber-600">
-                Warning: this email does not match your verified domain (
-                {RESEND_DOMAIN}). Sends may fail until you verify the domain or
-                update this address.
-              </p>
-            )}
           </Field>
 
           <Field

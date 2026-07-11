@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
 import { requireAuth } from "./_lib/auth";
+import { buildSendIdentity } from "./_lib/resend-from";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -15,21 +16,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(auth.status).json({ error: auth.error });
   }
 
-  const { subject, html, from, to } = (req.body || {}) as {
+  const { subject, html, to, senderName, replyTo } = (req.body || {}) as {
     subject?: string;
     html?: string;
-    from?: string;
     to?: string;
+    senderName?: string;
+    replyTo?: string;
+    /** @deprecated ignored — platform owns From */
+    from?: string;
   };
 
-  if (!from || !subject || !html || !to) {
+  if (!subject || !html || !to) {
     return res
       .status(400)
-      .json({ error: "from, subject, html and to are required" });
+      .json({ error: "subject, html and to are required" });
   }
 
   try {
-    const { error } = await resend.emails.send({ from, to, subject, html });
+    const identity = buildSendIdentity({
+      senderName: senderName || "EmailBlast",
+      replyToEmail: replyTo,
+    });
+    const { error } = await resend.emails.send({
+      ...identity,
+      to,
+      subject,
+      html,
+    });
     if (error) throw error;
     return res.status(200).json({ sent: true });
   } catch (err) {

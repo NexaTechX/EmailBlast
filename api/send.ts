@@ -3,15 +3,12 @@ import { Resend } from "resend";
 import { injectTracking, APP_URL } from "./_lib/tracking";
 import { requireAuth, verifyCampaignOwnership } from "./_lib/auth";
 import { sql } from "./_lib/db";
+import { maybeNotifyCampaignSent } from "./_lib/notify";
+import { assertCanSendEmails } from "./_lib/plan-limits";
+import { applyMergeTags } from "./_lib/merge-tags";
+import { buildSendIdentity } from "./_lib/resend-from";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-
-function formatFrom(senderName: string | null, senderEmail: string): string {
-  const email = senderEmail.trim();
-  const name = senderName?.trim();
-  if (name) return `${name} <${email}>`;
-  return email;
-}
 
 // POST /api/send — send a campaign via Resend with server-side recipient resolution.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -76,13 +73,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const subs = await sql`
-    select email from subscribers
+    select email, first_name, last_name from subscribers
     where list_id = ${campaign.list_id}
       and user_id = ${auth.user.id}
       and unsubscribed_at is null
   `;
 
-  const recipients = (subs as Array<{ email: string }>).map((s) => s.email);
+  const subRows = subs as Array<{
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+  }>;
+  const recipients = subRows.map((s) => s.email);
   if (recipients.length === 0) {
     return res.status(400).json({ error: "No active subscribers in the selected list" });
   }
@@ -97,22 +99,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     targetRecipients = subset;
   }
 
-  const from = formatFrom(campaign.sender_name, campaign.sender_email);
+  const subByEmail = new Map(
+    subRows.map((s) => [s.email.toLowerCase(), s] as const),
+  );
+
+  try {
+    await assertCanSendEmails(auth.user.id, targetRecipients.length);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Send limit exceeded";
+    return res.status(403).json({ error: message });
+  }
+
+  const identity = buildSendIdentity({
+    senderName: campaign.sender_name,
+    replyToEmail: campaign.sender_email,
+  });
   const subject = subjectOverride?.trim() || campaign.subject;
   const html = campaign.content;
   const mailingAddress = campaign.mailing_address.trim();
 
-  const messages = targetRecipients.map((email) => ({
-    from,
-    to: email,
-    subject,
-    html: injectTracking(html, campaignId, email, APP_URL, mailingAddress),
-    headers: { "X-Campaign-Id": String(campaignId) },
-    tags: [
-      { name: "campaign_id", value: String(campaignId) },
-      ...(variantId ? [{ name: "variant_id", value: String(variantId) }] : []),
-    ],
-  }));
+  const messages = targetRecipients.map((email) => {
+    const sub = subByEmail.get(email.toLowerCase());
+    const personalized = applyMergeTags(html, {
+      email,
+      first_name: sub?.first_name,
+      last_name: sub?.last_name,
+    });
+    return {
+      ...identity,
+      to: email,
+      subject,
+      html: injectTracking(
+        personalized,
+        campaignId,
+        email,
+        APP_URL,
+        mailingAddress,
+      ),
+      headers: { "X-Campaign-Id": String(campaignId) },
+      tags: [
+        { name: "campaign_id", value: String(campaignId) },
+        ...(variantId ? [{ name: "variant_id", value: String(variantId) }] : []),
+      ],
+    };
+  });
 
   let sentCount = 0;
   let hadError = false;
@@ -172,6 +202,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         where id = ${campaignId}
       `;
     }
+
+    await maybeNotifyCampaignSent({
+      userId: auth.user.id,
+      notifyEmail: auth.user.email,
+      campaignId,
+      subject,
+      sentCount,
+    });
 
     return res.status(200).json({ sent: sentCount });
   } catch (err) {

@@ -4,65 +4,71 @@
 
   @layer base {
     :root {
-      --background: 0 0% 100%;
-      --foreground: 222.2 84% 4.9%;
+      --background: 40 20% 99%;
+      --foreground: 220 25% 8%;
 
       --card: 0 0% 100%;
-      --card-foreground: 222.2 84% 4.9%;
+      --card-foreground: 220 25% 8%;
 
       --popover: 0 0% 100%;
-      --popover-foreground: 222.2 84% 4.9%;
+      --popover-foreground: 220 25% 8%;
 
-      --primary: 222.2 47.4% 11.2%;
-      --primary-foreground: 210 40% 98%;
+      --primary: 220 25% 10%;
+      --primary-foreground: 40 20% 99%;
 
-      --secondary: 210 40% 96.1%;
-      --secondary-foreground: 222.2 47.4% 11.2%;
+      --secondary: 220 14% 96%;
+      --secondary-foreground: 220 25% 10%;
 
-      --muted: 210 40% 96.1%;
-      --muted-foreground: 215.4 16.3% 46.9%;
+      --muted: 220 14% 96%;
+      --muted-foreground: 220 10% 42%;
 
-      --accent: 210 40% 96.1%;
-      --accent-foreground: 222.2 47.4% 11.2%;
+      --accent: 160 45% 94%;
+      --accent-foreground: 160 60% 22%;
 
       --destructive: 0 84.2% 60.2%;
       --destructive-foreground: 210 40% 98%;
 
-      --border: 214.3 31.8% 91.4%;
-      --input: 214.3 31.8% 91.4%;
-      --ring: 222.2 84% 4.9%;
+      --border: 220 14% 90%;
+      --input: 220 14% 90%;
+      --ring: 220 25% 10%;
 
-      --radius: 0.5rem;
+      --radius: 0.625rem;
+
+      --signal: 160 72% 36%;
+      --signal-soft: 160 45% 94%;
     }
 
     .dark {
-      --background: 222.2 84% 4.9%;
-      --foreground: 210 40% 98%;
+      --background: 220 25% 6%;
+      --foreground: 40 15% 96%;
 
-      --card: 222.2 84% 4.9%;
-      --card-foreground: 210 40% 98%;
+      --card: 220 22% 9%;
+      --card-foreground: 40 15% 96%;
 
-      --popover: 222.2 84% 4.9%;
-      --popover-foreground: 210 40% 98%;
+      --popover: 220 22% 9%;
+      --popover-foreground: 40 15% 96%;
 
-      --primary: 210 40% 98%;
-      --primary-foreground: 222.2 47.4% 11.2%;
+      --primary: 40 15% 96%;
+      --primary-foreground: 220 25% 8%;
 
-      --secondary: 217.2 32.6% 17.5%;
-      --secondary-foreground: 210 40% 98%;
+      --secondary: 220 18% 14%;
+      --secondary-foreground: 40 15% 96%;
 
-      --muted: 217.2 32.6% 17.5%;
-      --muted-foreground: 215 20.2% 65.1%;
+      --muted: 220 18% 14%;
+      --muted-foreground: 220 10% 62%;
 
-      --accent: 217.2 32.6% 17.5%;
-      --accent-foreground: 210 40% 98%;
+      --accent: 160 30% 14%;
+      --accent-foreground: 160 50% 72%;
 
       --destructive: 0 62.8% 30.6%;
       --destructive-foreground: 210 40% 98%;
 
-      --border: 217.2 32.6% 17.5%;
-      --input: 217.2 32.6% 17.5%;
-      --ring: 212.7 26.8% 83.9%;
+      --border: 220 16% 16%;
+      --input: 220 16% 16%;
+      --ring: 40 15% 85%;
+
+      --signal: 160 65% 45%;
+      --signal-soft: 160 30% 14%;
     }
   }
 
@@ -71,25 +77,95 @@
       @apply border-border;
     }
     body {
-      @apply bg-background text-foreground;
+      @apply bg-background font-sans text-foreground antialiased;
     }
   }
 
   @layer utilities {
-    /* Faint ruled backdrop — engineered, not glowy */
     .bg-grid {
       background-image:
-        linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
-        linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
-      background-size: 64px 64px;
+        linear-gradient(to right, hsl(var(--border) / 0.55) 1px, transparent 1px),
+        linear-gradient(to bottom, hsl(var(--border) / 0.55) 1px, transparent 1px);
+      background-size: 72px 72px;
+    }
+    .bg-hero-glow {
+      background:
+        radial-gradient(ellipse 80% 55% at 50% -10%, hsl(160 40% 50% / 0.12), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 90% 20%, hsl(220 30% 50% / 0.06), transparent 50%),
+        radial-gradient(ellipse 40% 35% at 10% 40%, hsl(40 40% 70% / 0.08), transparent 50%);
+    }
+    .dark .bg-hero-glow {
+      background:
+        radial-gradient(ellipse 80% 55% at 50% -10%, hsl(160 50% 40% / 0.14), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 85% 25%, hsl(220 40% 40% / 0.12), transparent 50%),
+        radial-gradient(ellipse 40% 35% at 10% 45%, hsl(220 20% 30% / 0.2), transparent 50%);
+    }
+    .text-signal {
+      color: hsl(var(--signal));
+    }
+    .bg-signal {
+      background-color: hsl(var(--signal));
+    }
+    .bg-signal-soft {
+      background-color: hsl(var(--signal-soft));
     }
     .animate-marquee {
-      animation: marquee 40s linear infinite;
+      animation: marquee 42s linear infinite;
     }
-    /* Subtle entrance for pulse dots */
+    .animate-marquee-slow {
+      animation: marquee 55s linear infinite;
+    }
     .pulse-dot {
-      box-shadow: 0 0 0 0 hsl(160 84% 39% / 0.5);
+      box-shadow: 0 0 0 0 hsl(var(--signal) / 0.45);
       animation: pulse-ring 2.4s cubic-bezier(0.66, 0, 0, 1) infinite;
+    }
+    .draw-line {
+      stroke-dasharray: 480;
+      stroke-dashoffset: 480;
+      animation: draw-line 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards;
+    }
+    .draw-area {
+      opacity: 0;
+      animation: fade-in 0.8s ease-out 1.2s forwards;
+    }
+    .caret-blink {
+      animation: caret 1s steps(1) infinite;
+    }
+    .metric-bar {
+      transform-origin: left center;
+      animation: grow-x 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    .float-y {
+      animation: float-y 5.5s ease-in-out infinite;
+    }
+    .float-y-delayed {
+      animation: float-y 6.5s ease-in-out 0.8s infinite;
+    }
+    .scan-line {
+      animation: scan 3.2s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pulse-dot,
+      .animate-marquee,
+      .animate-marquee-slow,
+      .draw-line,
+      .draw-area,
+      .caret-blink,
+      .metric-bar,
+      .float-y,
+      .float-y-delayed,
+      .scan-line {
+        animation: none !important;
+      }
+      .draw-line {
+        stroke-dashoffset: 0;
+      }
+      .draw-area {
+        opacity: 1;
+      }
+      .metric-bar {
+        transform: scaleX(1);
+      }
     }
   }
 
@@ -99,7 +175,141 @@
   }
 
   @keyframes pulse-ring {
-    0% { box-shadow: 0 0 0 0 hsl(160 84% 39% / 0.5); }
-    70% { box-shadow: 0 0 0 6px hsl(160 84% 39% / 0); }
-    100% { box-shadow: 0 0 0 0 hsl(160 84% 39% / 0); }
+    0% { box-shadow: 0 0 0 0 hsl(var(--signal) / 0.45); }
+    70% { box-shadow: 0 0 0 6px hsl(var(--signal) / 0); }
+    100% { box-shadow: 0 0 0 0 hsl(var(--signal) / 0); }
+  }
+
+  @keyframes draw-line {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes fade-in {
+    to { opacity: 1; }
+  }
+
+  @keyframes caret {
+    0%, 50% { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+  }
+
+  @keyframes grow-x {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  @keyframes float-y {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  @keyframes grow-y {
+    from { transform: scaleY(0); }
+    to { transform: scaleY(1); }
+  }
+
+  @keyframes scan {
+    0%, 100% { transform: translateY(0); opacity: 0; }
+    15% { opacity: 0.5; }
+    50% { transform: translateY(120px); opacity: 0.35; }
+    85% { opacity: 0; }
+  }
+
+  /* Campaign editor — email-shaped writing surface */
+  .email-editor-canvas {
+    background:
+      radial-gradient(ellipse 70% 40% at 50% 0%, hsl(var(--signal) / 0.04), transparent 55%),
+      hsl(var(--muted) / 0.45);
+    padding: 0.75rem 0.75rem 0;
+  }
+  @media (min-width: 1024px) {
+    .email-editor-canvas {
+      padding: 1rem 1.25rem 0;
+    }
+  }
+  .dark .email-editor-canvas {
+    background:
+      radial-gradient(ellipse 70% 40% at 50% 0%, hsl(var(--signal) / 0.06), transparent 55%),
+      hsl(var(--muted) / 0.25);
+  }
+  .email-editor-sheet {
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    border-radius: calc(var(--radius) + 2px);
+    box-shadow:
+      0 1px 0 hsl(var(--foreground) / 0.03),
+      0 12px 40px -24px hsl(var(--foreground) / 0.35);
+    margin-bottom: 2rem;
+    min-height: calc(100% - 1rem);
+  }
+  .email-editor-sheet .ProseMirror {
+    min-height: 240px;
+    outline: none;
+  }
+  .email-editor-prose {
+    font-size: 15px;
+    line-height: 1.65;
+    color: hsl(var(--foreground));
+  }
+  .email-editor-prose p {
+    margin: 0 0 0.85em;
+  }
+  .email-editor-prose h2 {
+    font-size: 1.35rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.6em;
+    line-height: 1.25;
+  }
+  .email-editor-prose h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 1.1em 0 0.45em;
+  }
+  .email-editor-prose ul,
+  .email-editor-prose ol {
+    margin: 0 0 0.85em;
+    padding-left: 1.25rem;
+  }
+  .email-editor-prose li {
+    margin: 0.2em 0;
+  }
+  .email-editor-prose .email-editor-link {
+    color: hsl(var(--signal));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .email-editor-prose .email-editor-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin: 0.75em 0;
+  }
+  .email-editor-prose p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    color: hsl(var(--muted-foreground));
+  }
+  .email-preview-body {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .email-preview-body p {
+    margin: 0 0 0.75em;
+  }
+  .email-preview-body h2,
+  .email-preview-body h3 {
+    margin: 0 0 0.5em;
+    letter-spacing: -0.015em;
+  }
+  .email-preview-body img {
+    max-width: 100%;
+    height: auto;
+  }
+  .email-preview-body a {
+    color: hsl(var(--signal));
   }

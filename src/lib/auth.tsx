@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { client } from "./neon";
 import { ensureDefaultSubscriberList } from "./api";
 
@@ -36,20 +37,51 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // session bootstrap so BOTH email/password and social logins get a profile
 // (the old code only created it inside signUp, so OAuth users never got one).
 // `id` is omitted so the DB default `auth.user_id()` fills it and RLS passes.
+let ensureProfileInFlight: Promise<void> | null = null;
+
 async function ensureProfile() {
-  try {
-    // Non-empty body (PostgREST rejects an empty insert). `id` is omitted so the
-    // DB default `auth.user_id()` fills it; ignoreDuplicates skips existing rows.
-    await client
-      .from("profiles")
-      .upsert(
-        { updated_at: new Date().toISOString() },
-        { onConflict: "id", ignoreDuplicates: true },
-      );
-    await ensureDefaultSubscriberList();
-  } catch (error) {
-    console.error("Error ensuring profile:", error);
+  if (ensureProfileInFlight) return ensureProfileInFlight;
+  ensureProfileInFlight = (async () => {
+    try {
+      // Non-empty body (PostgREST rejects an empty insert). `id` is omitted so the
+      // DB default `auth.user_id()` fills it; ignoreDuplicates skips existing rows.
+      const { error } = await client
+        .from("profiles")
+        .upsert(
+          { updated_at: new Date().toISOString() },
+          { onConflict: "id", ignoreDuplicates: true },
+        );
+      if (error) throw error;
+      await ensureDefaultSubscriberList();
+    } catch (error) {
+      console.error("Error ensuring profile:", error);
+    } finally {
+      ensureProfileInFlight = null;
+    }
+  })();
+  return ensureProfileInFlight;
+}
+
+/**
+ * Neon Auth sets a cookie on sign-in; getSession() can briefly return null until
+ * the cookie is readable. Retry so PrivateRoute does not bounce to /auth.
+ */
+async function waitForSession(attempts = 8, delayMs = 75) {
+  for (let i = 0; i < attempts; i++) {
+    const { data } = await client.auth.getSession();
+    if (data.session?.user) return data.session;
+    if (i < attempts - 1) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
   }
+  return null;
+}
+
+function toAuthUser(user: unknown): AuthUser | null {
+  if (!user || typeof user !== "object") return null;
+  const u = user as AuthUser;
+  if (!u.id) return null;
+  return u;
 }
 
 // Provides auth state and actions (sign in/up/out, OTP verification) to the tree.
@@ -58,34 +90,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
 
-  useEffect(() => {
-    // Check active session and set the user
-    client.auth.getSession().then(({ data: { session } }) => {
-      const sessionUser = (session?.user as AuthUser) ?? null;
+  const applySessionUser = (
+    sessionUser: AuthUser | null,
+    options?: { sync?: boolean },
+  ) => {
+    const apply = () => {
       setUser(sessionUser);
       setLoading(false);
       if (sessionUser) {
-        setIsEmailVerified(Boolean(sessionUser.email_confirmed_at) || true);
-        ensureProfile();
-      }
-    });
-
-    // Listen for auth state changes (signed in, signed out, etc.)
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange((_event, session) => {
-      const sessionUser = (session?.user as AuthUser) ?? null;
-      setUser(sessionUser);
-      setLoading(false);
-      if (sessionUser) {
-        setIsEmailVerified(Boolean(sessionUser.email_confirmed_at) || true);
-        ensureProfile();
+        setIsEmailVerified(Boolean(sessionUser.email_confirmed_at));
       } else {
         setIsEmailVerified(false);
       }
+    };
+    // Sync flush so navigate("/app") right after sign-in sees `user` set —
+    // otherwise PrivateRoute still has null and bounces back to /auth.
+    if (options?.sync) flushSync(apply);
+    else apply();
+    if (sessionUser) void ensureProfile();
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // Bootstrap from existing cookie/session, then subscribe to changes.
+    // Prefer a single getSession first so we don't race an empty INITIAL event.
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
+      applySessionUser(toAuthUser(session?.user));
     });
 
-    return () => subscription.unsubscribe();
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
+      applySessionUser(toAuthUser(session?.user));
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Registers a new account; reports whether email verification is still pending.
@@ -115,21 +160,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw error;
     }
-    // No error: a session exists only when verification is NOT required.
-    // Profile creation is handled by ensureProfile() on the resulting session.
-    return { needsVerification: !data?.session };
+
+    if (data?.session?.user) {
+      applySessionUser(toAuthUser(data.session.user), { sync: true });
+      return { needsVerification: false };
+    }
+
+    // Cookie may lag behind a successful signup that did create a session.
+    const session = await waitForSession();
+    if (session?.user) {
+      applySessionUser(toAuthUser(session.user), { sync: true });
+      return { needsVerification: false };
+    }
+
+    return { needsVerification: true };
   };
 
   // Signs the user in with email and password.
   const signIn = async (email: string, password: string) => {
-    const { error } = await client.auth.signInWithPassword({ email, password });
+    const { data, error } = await client.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (error) throw error;
+
+    const immediate = toAuthUser(data?.session?.user);
+    if (immediate) {
+      applySessionUser(immediate, { sync: true });
+      return;
+    }
+
+    const session = await waitForSession();
+    const sessionUser = toAuthUser(session?.user);
+    if (!sessionUser) {
+      throw new Error(
+        "Signed in, but the session was not ready yet. Please try again.",
+      );
+    }
+    applySessionUser(sessionUser, { sync: true });
   };
 
   // Ends the current session.
   const signOut = async () => {
     const { error } = await client.auth.signOut();
     if (error) throw error;
+    applySessionUser(null, { sync: true });
   };
 
   // Verify the email code the user received and make sure a session is open.
@@ -162,12 +237,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session && password) {
       try {
         await client.auth.signInWithPassword({ email, password });
-        session = (await client.auth.getSession()).data.session;
+        session = await waitForSession();
       } catch (signInError) {
         console.warn("Sign-in after verification failed:", signInError);
       }
+    } else if (!session) {
+      session = await waitForSession();
     }
-    return { hasSession: Boolean(session) };
+
+    const sessionUser = toAuthUser(session?.user);
+    if (sessionUser) {
+      applySessionUser(sessionUser, { sync: true });
+      return { hasSession: true };
+    }
+    return { hasSession: false };
   };
 
   // Re-send the verification email / code.
@@ -176,9 +259,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
-  const sendVerificationEmail = (_email: string): Promise<void> => {
-    // Email verification is handled by Neon Auth's built-in flow.
-    return Promise.resolve();
+  const sendVerificationEmail = async (email: string): Promise<void> => {
+    await resendVerification(email);
   };
 
   return (

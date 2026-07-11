@@ -34,7 +34,7 @@ const Home = () => {
   const [saving, setSaving] = useState(false);
   const [campaign, setCampaign] = useState<CampaignState>({
     title: "Untitled Campaign",
-    content: "<p>Start composing your email campaign...</p>",
+    content: "<p></p>",
     details: {
       subject: "",
       senderName: "",
@@ -244,17 +244,17 @@ const Home = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading campaign...</p>
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading campaign…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <CampaignHeader
         title={campaign.title}
         onTitleChange={handleTitleChange}
@@ -264,18 +264,13 @@ const Home = () => {
         campaign={campaign}
         saving={saving}
       />
-
-      <div className="flex h-[calc(100vh-72px)]">
-        <div className="w-full border-r border-gray-200">
-          <EnhancedCampaignEditor
-            onContentChange={handleContentChange}
-            onDetailsChange={handleDetailsChange}
-            initialContent={campaign.content}
-            initialDetails={campaign.details}
-            onSaveDraft={handleSaveDraft}
-            saving={saving}
-          />
-        </div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <EnhancedCampaignEditor
+          onContentChange={handleContentChange}
+          onDetailsChange={handleDetailsChange}
+          initialContent={campaign.content}
+          initialDetails={campaign.details}
+        />
       </div>
     </div>
   );

@@ -256,6 +256,45 @@ export const campaignAutomations = pgTable(
 ).enableRLS();
 
 // ---------------------------------------------------------------------------
+// automation_enrollments — drip progress per subscriber
+// ---------------------------------------------------------------------------
+export const automationEnrollments = pgTable(
+  "automation_enrollments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: ownerId(),
+    automationId: uuid("automation_id")
+      .notNull()
+      .references(() => campaignAutomations.id, { onDelete: "cascade" }),
+    subscriberId: uuid("subscriber_id")
+      .notNull()
+      .references(() => subscribers.id, { onDelete: "cascade" }),
+    currentStep: integer("current_step").notNull().default(0),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).defaultNow(),
+    status: text("status").notNull(),
+    createdAt,
+    updatedAt,
+  },
+  (t) => [
+    index("idx_automation_enrollments_user_id").on(t.userId),
+    index("idx_automation_enrollments_next_run").on(t.status, t.nextRunAt),
+    unique("idx_automation_enrollments_unique").on(
+      t.automationId,
+      t.subscriberId,
+    ),
+    crudPolicy({
+      role: authenticatedRole,
+      read: authUid(t.userId),
+      modify: authUid(t.userId),
+    }),
+    check(
+      "automation_enrollments_status_check",
+      sql`${t.status} in ('active','completed','paused','failed')`,
+    ),
+  ],
+).enableRLS();
+
+// ---------------------------------------------------------------------------
 // cold_outreach_sequences
 // ---------------------------------------------------------------------------
 export const coldOutreachSequences = pgTable(

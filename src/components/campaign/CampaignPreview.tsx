@@ -1,43 +1,53 @@
-import React, { useState } from "react";
-import { Card } from "../ui/card";
-import { Button } from "../ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Monitor, Smartphone, Download } from "lucide-react";
-import { useToast } from "../ui/use-toast";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 import { sendTestEmail } from "@/lib/resend";
+import { Monitor, Smartphone, Download } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 interface CampaignPreviewProps {
   content?: string;
   subject?: string;
   senderName?: string;
   senderEmail?: string;
+  /** Slimmer layout for editor side panel */
+  embedded?: boolean;
 }
 
+const FROM_DOMAIN = import.meta.env.VITE_RESEND_FROM_DOMAIN as
+  | string
+  | undefined;
+
 const CampaignPreview = ({
-  content = "<p>This is a preview of your email content...</p>",
-  subject = "Sample Email Campaign",
+  content = "<p></p>",
+  subject = "",
   senderName = "Sender",
   senderEmail = "",
+  embedded = false,
 }: CampaignPreviewProps) => {
-  const [activeView, setActiveView] = useState("desktop");
+  const [view, setView] = useState<"desktop" | "mobile">("desktop");
   const [testEmail, setTestEmail] = useState("");
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
 
+  const platformFrom = FROM_DOMAIN
+    ? `noreply@${FROM_DOMAIN}`
+    : "verified domain";
+
   const handleSendTest = async () => {
-    if (!testEmail) {
+    if (!testEmail.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a test email address",
+        title: "Email required",
+        description: "Enter an address to receive the test.",
         variant: "destructive",
       });
       return;
     }
-
-    if (!senderEmail) {
+    if (!senderEmail.trim()) {
       toast({
-        title: "Error",
-        description: "Set a sender email in campaign details first",
+        title: "Reply-to required",
+        description: "Set reply-to in the compose fields first.",
         variant: "destructive",
       });
       return;
@@ -49,8 +59,8 @@ const CampaignPreview = ({
         {
           id: "preview",
           title: "Test Email",
-          subject: subject,
-          content: content,
+          subject: subject || "Test",
+          content,
           sender_name: senderName,
           sender_email: senderEmail,
           status: "draft",
@@ -58,18 +68,17 @@ const CampaignPreview = ({
           updated_at: new Date().toISOString(),
           list_id: "test",
         },
-        testEmail,
+        testEmail.trim(),
       );
-
       toast({
-        title: "Success",
-        description: "Test email sent successfully",
+        title: "Test sent",
+        description: `Delivered to ${testEmail.trim()}`,
       });
     } catch (error) {
       console.error("Error sending test email:", error);
       toast({
-        title: "Error",
-        description: "Failed to send test email",
+        title: "Send failed",
+        description: "Could not send test email.",
         variant: "destructive",
       });
     } finally {
@@ -78,10 +87,9 @@ const CampaignPreview = ({
   };
 
   const handleDownload = () => {
-    const blob = new Blob(
-      [`Subject: ${subject}\n\n`, content],
-      { type: "text/html" },
-    );
+    const blob = new Blob([`Subject: ${subject}\n\n`, content], {
+      type: "text/html",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -91,76 +99,99 @@ const CampaignPreview = ({
   };
 
   return (
-    <Card className="w-full h-full bg-white p-4 flex flex-col gap-4">
-      <div className="flex items-center justify-between border-b pb-4">
-        <h3 className="text-lg font-semibold">Preview</h3>
-      </div>
-
-      <div className="flex-1 overflow-auto">
-        <Tabs
-          defaultValue="desktop"
-          value={activeView}
-          onValueChange={setActiveView}
+    <div className="flex h-full flex-col gap-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex rounded-md border border-border p-0.5">
+          <button
+            type="button"
+            onClick={() => setView("desktop")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs transition-colors",
+              view === "desktop"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Monitor className="h-3.5 w-3.5" />
+            Desktop
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("mobile")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-xs transition-colors",
+              view === "mobile"
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Smartphone className="h-3.5 w-3.5" />
+            Mobile
+          </button>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs"
+          onClick={handleDownload}
         >
-          <TabsList className="grid w-[200px] grid-cols-2">
-            <TabsTrigger value="desktop" className="flex items-center gap-2">
-              <Monitor className="h-4 w-4" />
-              Desktop
-            </TabsTrigger>
-            <TabsTrigger value="mobile" className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4" />
-              Mobile
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="desktop" className="h-full mt-4">
-            <div className="max-w-[800px] mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
-              <div className="p-4 border-b">
-                <div className="text-sm text-gray-600">Subject: {subject}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  From: {senderName} &lt;{senderEmail || "sender@example.com"}&gt;
-                </div>
-              </div>
-              <div
-                className="p-6"
-                dangerouslySetInnerHTML={{ __html: content }}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="mobile" className="h-full mt-4">
-            <div className="max-w-[375px] mx-auto bg-white shadow-lg rounded-lg overflow-hidden border">
-              <div className="p-3 border-b">
-                <div className="text-sm text-gray-600">Subject: {subject}</div>
-              </div>
-              <div
-                className="p-4"
-                dangerouslySetInnerHTML={{ __html: content }}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          HTML
+        </Button>
       </div>
 
-      <div className="flex justify-end gap-2 pt-4 border-t">
-        <div className="flex-1">
-          <input
+      <div
+        className={cn(
+          "overflow-hidden rounded-md border border-border bg-card shadow-sm",
+          view === "mobile" && "mx-auto w-[min(100%,320px)]",
+        )}
+      >
+        <div className="space-y-1 border-b border-border bg-muted/40 px-3 py-2.5">
+          <p className="truncate text-sm font-medium">
+            {subject || "Untitled subject"}
+          </p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            From {senderName || "Sender"} &lt;{platformFrom}&gt;
+          </p>
+          {senderEmail ? (
+            <p className="truncate text-[11px] text-muted-foreground">
+              Reply-to {senderEmail}
+            </p>
+          ) : null}
+        </div>
+        <div
+          className={cn(
+            "email-preview-body overflow-auto bg-card p-4",
+            embedded ? "max-h-[360px]" : "max-h-[480px]",
+          )}
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+      </div>
+
+      <div className="mt-auto space-y-2 border-t border-border pt-4">
+        <p className="text-xs text-muted-foreground">Send yourself a test</p>
+        <div className="flex gap-2">
+          <Input
             type="email"
-            placeholder="Enter test email address"
-            className="w-full px-3 py-2 border rounded-md"
+            placeholder="you@company.com"
             value={testEmail}
             onChange={(e) => setTestEmail(e.target.value)}
+            className="h-9"
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 shrink-0"
+            onClick={handleSendTest}
+            disabled={sending}
+          >
+            {sending ? "Sending…" : "Send"}
+          </Button>
         </div>
-        <Button variant="outline" onClick={handleSendTest} disabled={sending}>
-          {sending ? "Sending..." : "Send Test Email"}
-        </Button>
-        <Button variant="outline" onClick={handleDownload}>
-          <Download className="h-4 w-4 mr-2" />
-          Download
-        </Button>
       </div>
-    </Card>
+    </div>
   );
 };
 

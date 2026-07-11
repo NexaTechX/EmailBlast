@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   FlaskConical,
+  Workflow,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ const navigation = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard },
   { name: "Campaigns", href: "/app/campaigns", icon: Send },
   { name: "Subscribers", href: "/app/subscribers", icon: Users },
+  { name: "Automations", href: "/app/automations", icon: Workflow },
   { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
   { name: "A/B Testing", href: "/app/ab-testing", icon: FlaskConical },
   { name: "Lead finder (beta)", href: "/app/lead-finder", icon: Radar },
@@ -61,8 +63,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const email = (user as any)?.email as string | undefined;
   const initial = (email?.[0] || "U").toUpperCase();
 
+  const isEditorRoute =
+    location.pathname === "/app/campaigns/new" ||
+    /^\/app\/campaigns\/[^/]+$/.test(location.pathname);
+
   return (
-    <div className="flex min-h-screen bg-background">
+    <div
+      className={cn(
+        "flex bg-background",
+        isEditorRoute ? "h-dvh max-h-dvh overflow-hidden" : "min-h-screen",
+      )}
+    >
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
@@ -152,18 +163,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main */}
-      <div className="flex flex-1 flex-col lg:ml-64">
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-background/80 px-4 backdrop-blur-xl lg:hidden">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col lg:ml-64",
+          isEditorRoute && "h-dvh max-h-dvh overflow-hidden",
+        )}
+      >
+        <div className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-x-4 border-b bg-background/80 px-4 backdrop-blur-xl lg:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
           <Wordmark />
         </div>
 
-        <main className="flex-1">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
-            {children}
-          </div>
+        <main
+          className={cn(
+            "min-h-0 flex-1",
+            isEditorRoute && "flex flex-col overflow-hidden",
+          )}
+        >
+          {isEditorRoute ? (
+            children
+          ) : (
+            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
+              {children}
+            </div>
+          )}
         </main>
       </div>
     </div>

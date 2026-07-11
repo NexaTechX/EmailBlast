@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
+import { assertCanAddSubscribers } from "@/lib/quota";
 import Papa from "papaparse";
 import {
   Upload,
@@ -122,10 +123,13 @@ export function ImportSubscribers({
       let failed = 0;
       const errors: string[] = [];
 
+      await assertCanAddSubscribers(total);
+
       // Process subscribers in batches. `user_id` is omitted so the DB default
       // `auth.user_id()` fills it and RLS passes. phone/company/job_title are not
       // columns on `subscribers`, so they go into metadata.
       const batchSize = 100;
+      const importedEmails: string[] = [];
       for (let i = 0; i < subscribers.length; i += batchSize) {
         const batch = subscribers.slice(i, i + batchSize);
         const formattedBatch = batch.map((sub) => ({
@@ -171,6 +175,7 @@ export function ImportSubscribers({
             failed += validBatch.length;
           } else {
             success += validBatch.length;
+            importedEmails.push(...validBatch.map((s) => s.email));
           }
         }
 
@@ -181,6 +186,17 @@ export function ImportSubscribers({
         );
         setProgress(currentProgress);
         setImportResults({ total, success, failed, errors });
+      }
+
+      if (importedEmails.length > 0) {
+        try {
+          const { enrollSubscribersInAutomations } = await import(
+            "@/lib/automations"
+          );
+          await enrollSubscribersInAutomations(listId, importedEmails);
+        } catch (enrollErr) {
+          console.warn("Automation enrollment skipped:", enrollErr);
+        }
       }
 
       toast({
@@ -220,6 +236,7 @@ export function ImportSubscribers({
     }
 
     try {
+      await assertCanAddSubscribers(1);
       const { error } = await supabase.from("subscribers").insert({
         email: email.toLowerCase().trim(),
         first_name: firstName,
@@ -239,6 +256,16 @@ export function ImportSubscribers({
           throw error;
         }
       } else {
+        try {
+          const { enrollSubscribersInAutomations } = await import(
+            "@/lib/automations"
+          );
+          await enrollSubscribersInAutomations(listId, [
+            email.toLowerCase().trim(),
+          ]);
+        } catch (enrollErr) {
+          console.warn("Automation enrollment skipped:", enrollErr);
+        }
         toast({
           title: "Subscriber added",
           description: `${email} has been added to your subscriber list`,

@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   PenLine,
   LayoutTemplate,
@@ -6,141 +8,337 @@ import {
   Workflow,
   ShieldCheck,
   Radar,
-  ArrowUpRight,
 } from "lucide-react";
+import { Reveal, Stagger, StaggerItem, easeOut, useMotionSafe } from "./motion";
 
 const features = [
   {
     icon: PenLine,
     name: "AI copywriter",
     description:
-      "Describe the goal; get subject lines and full campaigns drafted in your voice. Edit anything.",
+      "Describe the goal; get subject lines and body copy drafted fast. Edit everything before you send.",
   },
   {
     icon: LayoutTemplate,
-    name: "No-code builder",
+    name: "Campaign editor",
     description:
-      "Compose with brand blocks and live preview. Pixel-perfect on every client, every device.",
+      "Write with formatting, templates, and live preview — then send through Resend.",
   },
   {
     icon: BarChart3,
-    name: "Live analytics",
+    name: "Performance analytics",
     description:
-      "Opens, clicks, conversions and revenue — streamed in real time, segment by segment.",
+      "Track sends, unique opens, clicks, conversions, bounces, and unsubscribes per campaign.",
   },
   {
     icon: Filter,
-    name: "Segmentation",
+    name: "Lists & tags",
     description:
-      "Dynamic lists from tags, events, and behavior. Send the right message to the right people.",
+      "Organize subscribers into lists, filter by tags, and import from CSV in minutes.",
   },
   {
     icon: Workflow,
-    name: "Automations",
+    name: "Welcome automations",
     description:
-      "Welcome series, drips, and win-backs that run on autopilot from a single canvas.",
+      "Drip delayed emails when someone joins a list. Activate, pause, or edit anytime.",
   },
   {
     icon: ShieldCheck,
-    name: "Deliverability",
+    name: "Compliance built in",
     description:
-      "Authentication, warm-up, and reputation monitoring keep you out of spam — for good.",
+      "CAN-SPAM checks plus automatic unsubscribe links and mailing address footers.",
   },
 ];
 
-export function Features() {
-  return (
-    <section className="border-b">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        {/* section header */}
-        <div className="flex flex-col gap-6 border-b py-16 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              01 — Capabilities
-            </p>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-[2.5rem] sm:leading-[1.1]">
-              Everything you need to ship
-              <br className="hidden sm:block" /> campaigns that perform.
-            </h2>
-          </div>
-          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-            One workspace, from the first draft to the final report. No glue code,
-            no spreadsheets, no tab-juggling.
-          </p>
-        </div>
-      </div>
+const demos = [
+  {
+    id: "write",
+    label: "Write",
+    title: "AI that drafts, you decide",
+    body: "Brief the model once. Get scored subject lines and body variants — nothing sends without you.",
+  },
+  {
+    id: "segment",
+    label: "Segment",
+    title: "Lists that stay clean",
+    body: "Import, dedupe, tag, and target. Segments update as engagement changes.",
+  },
+  {
+    id: "measure",
+    label: "Measure",
+    title: "Signal without the spreadsheet",
+    body: "Opens, clicks, and conversions land in one campaign view as events arrive.",
+  },
+] as const;
 
-      {/* ruled feature grid */}
-      <div className="mx-auto grid max-w-7xl grid-cols-1 border-x sm:grid-cols-2 lg:grid-cols-3">
-        {features.map((f, i) => (
-          <div
-            key={f.name}
-            className="group border-b border-r p-8 transition-colors hover:bg-muted/40 [&:nth-child(2n)]:border-r-0 sm:[&:nth-child(2n)]:border-r lg:[&:nth-child(2n)]:border-r lg:[&:nth-child(3n)]:border-r-0"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-card">
-                <f.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
-              </div>
-              <span className="font-mono text-xs text-muted-foreground/60">
-                {String(i + 1).padStart(2, "0")}
-              </span>
+export function Features() {
+  const [active, setActive] = useState<(typeof demos)[number]["id"]>("write");
+  const demo = demos.find((d) => d.id === active)!;
+
+  return (
+    <section className="py-20 lg:py-28">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <Reveal className="max-w-2xl">
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            Platform
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl sm:leading-[1.1]">
+            A workspace that feels like the product you already imagined.
+          </h2>
+          <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">
+            Not another tab farm. One surface from brief to inbox report.
+          </p>
+        </Reveal>
+
+        {/* Interactive product demo */}
+        <Reveal delay={0.08} className="mt-12">
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
+            <div className="flex flex-wrap items-center gap-1 border-b bg-muted/20 p-2">
+              {demos.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setActive(d.id)}
+                  className={`relative rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+                    active === d.id
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {active === d.id && (
+                    <motion.span
+                      layoutId="feature-tab"
+                      className="absolute inset-0 rounded-lg border bg-background shadow-sm"
+                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">{d.label}</span>
+                </button>
+              ))}
             </div>
-            <h3 className="mt-6 text-base font-semibold tracking-tight">
-              {f.name}
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {f.description}
-            </p>
+
+            <div className="grid lg:grid-cols-[0.95fr_1.15fr]">
+              <div className="border-b p-7 sm:p-8 lg:border-b-0 lg:border-r">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={demo.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.28, ease: easeOut }}
+                  >
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-signal">
+                      {demo.label}
+                    </p>
+                    <h3 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
+                      {demo.title}
+                    </h3>
+                    <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                      {demo.body}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              <div className="relative min-h-[260px] bg-muted/15 p-5 sm:p-6">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={demo.id}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.99 }}
+                    transition={{ duration: 0.3, ease: easeOut }}
+                    className="h-full"
+                  >
+                    {demo.id === "write" && <WriteGui />}
+                    {demo.id === "segment" && <SegmentGui />}
+                    {demo.id === "measure" && <MeasureGui />}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
+        <Stagger className="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <StaggerItem key={f.name}>
+              <div className="group h-full rounded-xl border border-transparent p-1 transition-colors duration-300 hover:border-border hover:bg-muted/30">
+                <div className="p-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-card shadow-sm transition-all duration-300 group-hover:border-signal/25 group-hover:bg-signal-soft group-hover:shadow-md">
+                    <f.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  </div>
+                  <h3 className="mt-5 text-[15px] font-semibold tracking-tight">
+                    {f.name}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {f.description}
+                  </p>
+                </div>
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
+
+        <Reveal delay={0.1} className="mt-16">
+          <LeadFinderBanner />
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+function WriteGui() {
+  return (
+    <div className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium">Campaign brief</span>
+        <span className="rounded bg-signal-soft px-1.5 py-0.5 font-mono text-[9px] text-signal">
+          Ready
+        </span>
+      </div>
+      <div className="mt-3 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+        Announce spring access to engaged users. Tone: confident, short. CTA:
+        claim access.
+      </div>
+      <div className="mt-4 space-y-2">
+        {[
+          { s: "Your spring access is live", score: 92 },
+          { s: "Claim your seat before Friday", score: 87 },
+          { s: "Something new for your list", score: 71 },
+        ].map((row, i) => (
+          <div
+            key={row.s}
+            className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-xs ${
+              i === 0 ? "border-signal/30 bg-signal-soft/50" : "bg-background"
+            }`}
+          >
+            <span className="font-medium text-foreground/90">{row.s}</span>
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {row.score}
+            </span>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
 
-      {/* Capstone — Lead finder / scraping */}
-      <div className="group mx-auto max-w-7xl border-x border-b">
-        <div className="grid grid-cols-1 gap-6 p-8 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] sm:items-center sm:gap-12">
-          <div>
-            <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-card">
-                <Radar className="h-[18px] w-[18px]" strokeWidth={1.75} />
-              </div>
-              <span className="font-mono text-xs text-muted-foreground/60">07</span>
-            </div>
-            <div className="mt-6 flex items-center gap-2">
-              <h3 className="text-base font-semibold tracking-tight">
-                Lead finder
-              </h3>
-              <span className="rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald-600">
-                New
-              </span>
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Find new customers without leaving the app.
-            </p>
+function SegmentGui() {
+  return (
+    <div className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm">
+      <p className="text-xs font-medium">Engaged · 30 days</p>
+      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+        4,812 contacts · auto-refresh
+      </p>
+      <div className="mt-4 space-y-3">
+        {[
+          { name: "Opened in 30d", count: "3,740" },
+          { name: "Clicked once+", count: "1,208" },
+          { name: "Exclude bounced", count: "−64" },
+        ].map((row) => (
+          <div
+            key={row.name}
+            className="flex items-center justify-between border-b border-dashed pb-2.5 text-xs last:border-0"
+          >
+            <span className="text-muted-foreground">{row.name}</span>
+            <span className="font-mono font-medium tabular-nums">{row.count}</span>
           </div>
-
-          <div className="sm:border-l sm:pl-12">
-            <p className="text-[0.95rem] leading-relaxed text-foreground/90">
-              Scrape verified business leads from any website, domain, or search
-              query — names, roles, and emails — enriched and deduped, then pushed
-              straight into a segment that&apos;s ready to send.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1 w-1 rounded-full bg-emerald-500" /> By domain
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1 w-1 rounded-full bg-emerald-500" /> By URL
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1 w-1 rounded-full bg-emerald-500" /> AI-enriched
-              </span>
-              <span className="ml-auto inline-flex items-center gap-1 text-foreground/70 transition-colors group-hover:text-foreground">
-                Explore <ArrowUpRight className="h-3.5 w-3.5" />
-              </span>
-            </div>
-          </div>
+        ))}
+      </div>
+      <div className="mt-auto pt-4">
+        <div className="rounded-lg border border-dashed px-3 py-2.5 text-[11px] text-muted-foreground">
+          Rule: <span className="text-foreground">opened ≥ 1</span> AND{" "}
+          <span className="text-foreground">status = active</span>
         </div>
       </div>
-    </section>
+    </div>
+  );
+}
+
+function MeasureGui() {
+  const bars = [42, 58, 51, 70, 64, 78, 88];
+  return (
+    <div className="flex h-full flex-col rounded-xl border bg-card p-4 shadow-sm">
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-xs font-medium">Campaign performance</p>
+          <p className="mt-1 font-mono text-2xl font-semibold tabular-nums tracking-tight">
+            42.8%
+          </p>
+        </div>
+        <span className="font-mono text-[10px] text-signal">opens · 7d</span>
+      </div>
+      <div className="mt-5 flex h-24 items-end gap-1.5">
+        {bars.map((h, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-sm bg-signal/80"
+            style={{
+              height: `${h}%`,
+              animation: `grow-y 0.6s cubic-bezier(0.22, 1, 0.36, 1) ${0.05 * i}s both`,
+              transformOrigin: "bottom",
+            }}
+          />
+        ))}
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        {[
+          ["12.3%", "CTR"],
+          ["846", "Conv."],
+          ["0.4%", "Bounce"],
+        ].map(([v, k]) => (
+          <div key={k} className="rounded-md border bg-muted/30 py-2">
+            <p className="font-mono text-xs font-semibold tabular-nums">{v}</p>
+            <p className="mt-0.5 font-mono text-[9px] text-muted-foreground">{k}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LeadFinderBanner() {
+  const animate = useMotionSafe();
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border bg-foreground text-background">
+      <div className="pointer-events-none absolute inset-0 opacity-40">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-signal/20 blur-3xl transition-opacity duration-500 group-hover:opacity-80" />
+      </div>
+      <div className="relative grid gap-8 p-8 sm:p-10 lg:grid-cols-[1fr_1.15fr] lg:items-center lg:gap-14">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-background/15 bg-background/10 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-background/70">
+            <Radar className="h-3 w-3" />
+            New · Lead finder
+          </div>
+          <h3 className="mt-5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            Find customers without leaving the app.
+          </h3>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-background/60">
+            Pull verified business leads from a domain or URL — names, roles,
+            emails — enriched and ready to segment.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            { label: "By domain", sample: "acme.com → 128 leads" },
+            { label: "By URL", sample: "Page scrape · roles" },
+            { label: "AI-enriched", sample: "Title · company · email" },
+          ].map((item, i) => (
+            <motion.div
+              key={item.label}
+              initial={animate ? { opacity: 0, y: 10 } : false}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 + i * 0.08, duration: 0.4, ease: easeOut }}
+              className="rounded-xl border border-background/10 bg-background/[0.06] px-4 py-5 backdrop-blur-sm transition-colors duration-300 hover:bg-background/[0.1]"
+            >
+              <p className="text-sm font-medium text-background/95">{item.label}</p>
+              <p className="mt-2 font-mono text-[10px] text-background/45">
+                {item.sample}
+              </p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

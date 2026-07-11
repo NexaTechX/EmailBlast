@@ -71,11 +71,11 @@ The Vite dev server serves the SPA only. To test `/api` routes locally:
 # Terminal 1 — frontend
 npm run dev
 
-# Terminal 2 — API routes (recommended)
+# Terminal 2 — API routes (tsx local server on :3000)
 npm run dev:api
 ```
 
-Or deploy to Vercel and use preview URLs for full end-to-end testing.
+Vite proxies `/api/*` to `http://localhost:3000`. Without `dev:api`, scrape/AI/send calls fail with connection errors.
 
 ### 5. Build
 

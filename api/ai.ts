@@ -1,12 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Groq from "groq-sdk";
+import { requireAuth } from "./_lib/auth";
 
-// Server-side AI for EmailBlast. The GROQ_API_KEY stays here — no model key ships
-// to the browser (replaces legacy client-side AI calls with hardcoded keys).
-//
-// Model choice per feature:
-//   - email copywriting (generate/enhance) -> openai/gpt-oss-120b (best quality)
-//   - bulk lead JSON (generate/domain/enrich) -> openai/gpt-oss-20b (fast/cheap)
+// Server-side AI for EmailBlast. GROQ_API_KEY stays server-side.
+// Copy / subjects / insights use CONTENT_MODEL; lead formatting uses LEADS_MODEL.
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const CONTENT_MODEL = "openai/gpt-oss-120b";
@@ -17,13 +14,13 @@ type AiBody = {
   prompt?: string;
   instructions?: string;
   content?: string;
-  query?: string;
-  count?: number;
-  domains?: string[];
-  leads?: unknown[];
+  subject?: string;
+  tone?: string;
+  sourceUrl?: string;
+  sources?: Array<{ sourceUrl?: string; markdown?: string; json?: unknown }>;
+  metrics?: Record<string, number | string>;
 };
 
-/** Strip ```html / ``` fences a model sometimes wraps content in. */
 function stripFences(text: string): string {
   const trimmed = text.trim();
   if (trimmed.includes("```html"))
@@ -33,7 +30,6 @@ function stripFences(text: string): string {
   return trimmed;
 }
 
-/** Run a single Groq chat completion and return the assistant's message content. */
 async function chat(
   model: string,
   system: string,
@@ -55,16 +51,21 @@ async function chat(
 
 const COPY_SYSTEM =
   "You are an expert email-marketing copywriter. Return ONLY the requested HTML — no explanations, no markdown code fences.";
-const LEADS_SYSTEM =
-  'You generate realistic sample business leads as STRICT JSON. Always return a single JSON object with a top-level "leads" array. No prose, no markdown.';
 
-/** POST /api/ai — dispatches each AI feature to the right Groq model. */
+const FORMAT_LEADS_SYSTEM = `You format business contacts extracted from web page text into STRICT JSON.
+Rules:
+- Use ONLY facts present in the provided source text/JSON. Never invent emails, phones, LinkedIn URLs, names, or companies.
+- If a field is not clearly present, omit it or use an empty string.
+- Each lead MUST include sourceUrl matching the page it came from.
+- Prefer contacts that have an email address.
+- Return {"leads":[{name,title,company,email,phone,linkedin,website,industry,location,confidenceScore}]}.`;
+
+/** POST /api/ai */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { requireAuth } = await import("./_lib/auth");
   const auth = await requireAuth(req);
   if ("error" in auth) {
     return res.status(auth.status).json({ error: auth.error });
@@ -97,36 +98,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ content: html });
       }
 
-      case "generate_leads": {
+      case "format_leads": {
+        const sources = body.sources ?? [];
+        if (!sources.length) {
+          return res.status(400).json({ error: "sources are required" });
+        }
         const raw = await chat(
           LEADS_MODEL,
-          LEADS_SYSTEM,
-          `Generate ${body.count ?? 5} realistic business leads for the search query: "${body.query}". Each lead object must have: name, title, company, email, phone, linkedin, website, industry, employees, location. Respond as {"leads": [ ... ]}.`,
+          FORMAT_LEADS_SYSTEM,
+          `Format contacts from these scraped pages. Do not invent any fields.\n\n${JSON.stringify(sources).slice(0, 120000)}`,
           true,
         );
-        return res.status(200).json({ leads: JSON.parse(raw).leads ?? [] });
+        const parsed = JSON.parse(raw) as { leads?: unknown[] };
+        return res.status(200).json({ leads: parsed.leads ?? [] });
       }
 
-      case "generate_domain_leads": {
-        const domains: string[] = body.domains ?? [];
+      case "suggest_subjects": {
         const raw = await chat(
-          LEADS_MODEL,
-          LEADS_SYSTEM,
-          `Generate realistic business leads for these company domains: ${domains.join(", ")}. For each domain create 1-3 leads for key decision makers (C-level, VP, Director, Manager). Each lead must have: name, title, company, email (using the domain), phone, linkedin, website, industry, employees, location. Respond as {"leads": [ ... ]}.`,
+          CONTENT_MODEL,
+          'You write email subject lines. Return STRICT JSON: {"subjects":[{"subject":"...","preview":"..."}]} — exactly 5 items. No prose.',
+          `Suggest 5 email subject lines and short preview texts.\nTone: ${body.tone || "professional"}.\nCurrent subject: ${body.subject || "(none)"}\nEmail HTML body:\n${(body.content || "").slice(0, 8000)}`,
           true,
         );
-        return res.status(200).json({ leads: JSON.parse(raw).leads ?? [] });
+        const parsed = JSON.parse(raw) as {
+          subjects?: Array<{ subject?: string; preview?: string }>;
+        };
+        return res.status(200).json({ subjects: parsed.subjects ?? [] });
       }
 
-      case "enrich_leads": {
-        const leads = body.leads ?? [];
+      case "insert_personalization": {
+        const html = stripFences(
+          await chat(
+            CONTENT_MODEL,
+            COPY_SYSTEM,
+            `Add personalization merge tags to this HTML email where natural. Only use these tags: {{first_name}}, {{last_name}}, {{email}}. Do not invent subscriber data. Prefer greeting like "Hi {{first_name}},". Return ONLY the HTML.\n\n${body.content}`,
+          ),
+        );
+        return res.status(200).json({ content: html });
+      }
+
+      case "summarize_campaign": {
         const raw = await chat(
-          LEADS_MODEL,
-          LEADS_SYSTEM,
-          `Enrich these business leads with: personalEmail, directPhone, mobile, education, previousCompanies (array), technologies (array), founded, revenue, companySize, interests (array), confidenceScore (50-100). Keep existing fields. Leads: ${JSON.stringify(leads)}. Respond as {"leads": [ ... ]}.`,
+          CONTENT_MODEL,
+          'You are an email marketing analyst. Return STRICT JSON: {"summary":"...","nextSteps":["...","...","..."]}. Be concrete and brief. No fake revenue claims.',
+          `Summarize this campaign performance and give 3 next steps.\nSubject: ${body.subject || "(unknown)"}\nMetrics: ${JSON.stringify(body.metrics || {})}`,
           true,
         );
-        return res.status(200).json({ leads: JSON.parse(raw).leads ?? leads });
+        const parsed = JSON.parse(raw) as {
+          summary?: string;
+          nextSteps?: string[];
+        };
+        return res.status(200).json({
+          summary: parsed.summary ?? "",
+          nextSteps: parsed.nextSteps ?? [],
+        });
       }
 
       default:

@@ -9,8 +9,8 @@ const plans = [
     name: "Free",
     price: "$0",
     features: [
-      "Up to 500 subscribers",
-      "1,000 emails per month",
+      "Up to 200 subscribers",
+      "100 emails per month",
       "Basic templates",
       "Email support",
     ],

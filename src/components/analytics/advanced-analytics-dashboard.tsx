@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Activity, Download } from "lucide-react";
+import { Activity, Download, Sparkles } from "lucide-react";
 import { getCampaignAnalytics } from "@/components/analytics/analytics-utils";
 import { getCampaigns } from "@/lib/api";
+import { summarizeCampaign } from "@/lib/groq-api";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,7 @@ import type { CampaignAnalytics, Campaign } from "@/types";
 interface AnalyticsSummary {
   opens: number;
   clicks: number;
+  conversions: number;
   unsubscribes: number;
   bounces: number;
   sent: number;
@@ -28,6 +30,8 @@ const eventDot = (type: CampaignAnalytics["event_type"]) => {
       return "bg-sky-500";
     case "click":
       return "bg-emerald-500";
+    case "conversion":
+      return "bg-indigo-500";
     case "unsubscribe":
       return "bg-amber-500";
     case "bounce":
@@ -51,21 +55,27 @@ export function AdvancedAnalyticsDashboard({
   const [summary, setSummary] = useState<AnalyticsSummary>({
     opens: 0,
     clicks: 0,
+    conversions: 0,
     unsubscribes: 0,
     bounces: 0,
     sent: 0,
     totalEvents: 0,
   });
   const [timeframe, setTimeframe] = useState<"day" | "week" | "month">("week");
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insight, setInsight] = useState<{
+    summary: string;
+    nextSteps: string[];
+  } | null>(null);
 
   const calculateSummary = (data: CampaignAnalytics[]) => {
     const uniqueOpens = new Set<string>();
     const uniqueClicks = new Set<string>();
+    const uniqueConversions = new Set<string>();
 
     const next = data.reduce(
       (acc, event) => {
         acc.totalEvents++;
-        const key = `${event.email || event.subscriber_id}-${event.event_type}`;
         switch (event.event_type) {
           case "open":
             if (event.email) uniqueOpens.add(event.email);
@@ -74,6 +84,10 @@ export function AdvancedAnalyticsDashboard({
           case "click":
             if (event.email) uniqueClicks.add(event.email);
             acc.clicks = uniqueClicks.size;
+            break;
+          case "conversion":
+            if (event.email) uniqueConversions.add(event.email);
+            acc.conversions = uniqueConversions.size;
             break;
           case "unsubscribe":
             acc.unsubscribes++;
@@ -92,6 +106,7 @@ export function AdvancedAnalyticsDashboard({
       {
         opens: 0,
         clicks: 0,
+        conversions: 0,
         unsubscribes: 0,
         bounces: 0,
         sent: 0,
@@ -102,14 +117,15 @@ export function AdvancedAnalyticsDashboard({
   };
 
   useEffect(() => {
-    if (campaignId === "overview") {
-      getCampaigns().then((list) => {
+    getCampaigns()
+      .then((list) => {
         setCampaigns(list);
-        if (list.length > 0 && selectedCampaign === "overview") {
+        if (campaignId === "overview" && list.length > 0 && selectedCampaign === "overview") {
           setSelectedCampaign(list[0].id);
         }
-      }).catch(console.error);
-    } else {
+      })
+      .catch(console.error);
+    if (campaignId !== "overview") {
       setSelectedCampaign(campaignId);
     }
   }, [campaignId]);
@@ -126,6 +142,7 @@ export function AdvancedAnalyticsDashboard({
       const data = await getCampaignAnalytics(id, timeframe);
       setAnalytics(data as CampaignAnalytics[]);
       calculateSummary(data as CampaignAnalytics[]);
+      setInsight(null);
     } catch (error) {
       console.error("Error loading analytics:", error);
       toast({
@@ -133,6 +150,35 @@ export function AdvancedAnalyticsDashboard({
         title: "Error",
         description: "Failed to load analytics. Please try again later.",
       });
+    }
+  };
+
+  const handleInsights = async () => {
+    const campaign = campaigns.find((c) => c.id === selectedCampaign);
+    setInsightLoading(true);
+    try {
+      const data = await summarizeCampaign({
+        subject: campaign?.subject,
+        metrics: {
+          sent: summary.sent,
+          opens: summary.opens,
+          clicks: summary.clicks,
+          conversions: summary.conversions,
+          unsubscribes: summary.unsubscribes,
+          bounces: summary.bounces,
+          openRate: `${openRate}%`,
+          clickRate: `${clickRate}%`,
+        },
+      });
+      setInsight(data);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Insights failed",
+        description: err instanceof Error ? err.message : "Try again",
+      });
+    } finally {
+      setInsightLoading(false);
     }
   };
 
@@ -179,9 +225,9 @@ export function AdvancedAnalyticsDashboard({
       sub: `${clickRate}% click-through`,
     },
     {
-      label: "Unsubscribes",
-      value: String(summary.unsubscribes),
-      sub: `${summary.bounces} bounced`,
+      label: "Conversions",
+      value: String(summary.conversions),
+      sub: "Links with eb_convert=1",
     },
   ];
 
@@ -213,6 +259,17 @@ export function AdvancedAnalyticsDashboard({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {summary.sent > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleInsights}
+              disabled={insightLoading}
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              {insightLoading ? "Analyzing..." : "AI insights"}
+            </Button>
+          )}
           {analytics.length > 0 && (
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="h-4 w-4 mr-1" />
@@ -250,6 +307,20 @@ export function AdvancedAnalyticsDashboard({
           </div>
         ))}
       </div>
+
+      {insight && (
+        <div className="border p-5 space-y-3">
+          <h3 className="text-sm font-semibold">AI insights</h3>
+          <p className="text-sm text-muted-foreground">{insight.summary}</p>
+          {insight.nextSteps.length > 0 && (
+            <ul className="list-disc pl-5 text-sm space-y-1">
+              {insight.nextSteps.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="border">
         <div className="flex items-center justify-between border-b px-5 py-3.5">

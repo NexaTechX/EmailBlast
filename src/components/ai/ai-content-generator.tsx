@@ -1,261 +1,211 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sparkles, RefreshCw, Copy, Check, Lightbulb } from "lucide-react";
+import { RefreshCw, Check } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { generateContent as generateAiContent } from "@/lib/groq-api";
+import {
+  generateContent as generateAiContent,
+  suggestSubjects,
+  type SubjectSuggestion,
+} from "@/lib/groq-api";
 
 interface AIContentGeneratorProps {
   onSelectContent?: (content: string) => void;
+  onSelectSubject?: (subject: string) => void;
+  currentContent?: string;
+  currentSubject?: string;
 }
 
 export function AIContentGenerator({
   onSelectContent = () => {},
+  onSelectSubject = () => {},
+  currentContent = "",
+  currentSubject = "",
 }: AIContentGeneratorProps) {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<SubjectSuggestion[]>([]);
   const { toast } = useToast();
 
   const generateContent = async () => {
-    // If prompt is empty, show some example prompts
-    if (!prompt.trim()) {
-      const examplePrompts = [
-        "Create a welcome email for new subscribers",
-        "Write a product launch announcement",
-        "Draft a monthly newsletter with company updates",
-        "Compose a thank you email for customers",
-        "Create a promotional email for our holiday sale",
-      ];
-
-      const selectedPrompt = window.prompt(
-        "What kind of email would you like to create? Or choose one of these examples:",
-        examplePrompts.join("\n"),
-      );
-
-      if (selectedPrompt) {
-        setPrompt(selectedPrompt);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Empty prompt",
-          description:
-            "Please enter instructions for the AI to generate content.",
-        });
-        return;
-      }
-    }
     if (!prompt.trim()) {
       toast({
         variant: "destructive",
-        title: "Empty prompt",
-        description:
-          "Please enter instructions for the AI to generate content.",
+        title: "Describe the email",
+        description: "A short brief produces better draft copy.",
       });
       return;
     }
 
     setLoading(true);
     try {
-      // Generate content via our server-side AI (Groq) — no key in the browser
       const generatedContent = await generateAiContent(prompt);
-
-      // Generate a few variations with slight modifications
-      const variations = [
-        generatedContent,
-        generatedContent
-          .replace(/Dear (Subscriber|Customer|Client|User)/i, "Hello there")
-          .replace(/(Best|Kind) regards/i, "Cheers"),
-        generatedContent
-          .replace(/<h[1-2]>/i, (match) => `${match}🚀 `)
-          .replace(/<p>(Best|Kind) regards/i, "<p>Thank you for your time,"),
-      ];
-
-      setSuggestions(variations);
+      setSuggestions([generatedContent]);
       toast({
-        title: "Content generated",
-        description: "AI has created content based on your instructions.",
+        title: "Draft ready",
+        description: "Review it, then apply to the campaign body.",
       });
     } catch (error) {
-      console.error("Error generating content:", error);
-
-      // Fallback to local generation if API fails
-      try {
-        // Generate content based on prompt
-        let generatedContent = "";
-
-        if (
-          prompt.toLowerCase().includes("welcome") ||
-          prompt.toLowerCase().includes("introduction")
-        ) {
-          generatedContent = `<h2>Welcome to Our Newsletter!</h2>
-<p>Dear Subscriber,</p>
-<p>We're excited to have you join our community. Each month, we'll be sharing the latest updates, tips, and exclusive offers just for you.</p>
-<p>In this edition, we're highlighting:</p>
-<ul>
-  <li>Our new product launch</li>
-  <li>Expert tips to improve your workflow</li>
-  <li>Upcoming events you won't want to miss</li>
-</ul>
-<p>Feel free to reply to this email with any questions or feedback.</p>
-<p>Best regards,<br>The Team</p>`;
-        } else if (
-          prompt.toLowerCase().includes("product") ||
-          prompt.toLowerCase().includes("launch")
-        ) {
-          generatedContent = `<h2>Introducing Our New Product!</h2>
-<p>Dear Valued Customer,</p>
-<p>We're thrilled to announce the launch of our latest product that's going to revolutionize how you work.</p>
-<h3>Key Features:</h3>
-<ul>
-  <li><strong>Streamlined Interface</strong> - Intuitive design for maximum productivity</li>
-  <li><strong>Advanced Analytics</strong> - Gain deeper insights into your performance</li>
-  <li><strong>Cloud Integration</strong> - Access your work from anywhere, anytime</li>
-</ul>
-<p><a href="#">Click here</a> to learn more and get an exclusive early-bird discount!</p>
-<p>Warm regards,<br>The Product Team</p>`;
-        } else if (
-          prompt.toLowerCase().includes("thank") ||
-          prompt.toLowerCase().includes("appreciation")
-        ) {
-          generatedContent = `<h2>Thank You for Your Support!</h2>
-<p>Dear Customer,</p>
-<p>We wanted to take a moment to express our sincere gratitude for your continued support. Customers like you make what we do possible.</p>
-<p>As a token of our appreciation, we're offering you:</p>
-<ul>
-  <li>A special 20% discount on your next purchase</li>
-  <li>Early access to our upcoming features</li>
-  <li>Complimentary consultation with our experts</li>
-</ul>
-<p>We look forward to serving you for many years to come.</p>
-<p>With appreciation,<br>The Entire Team</p>`;
-        } else {
-          // Default content based on the prompt
-          generatedContent = `<h2>${prompt.split(" ").slice(0, 5).join(" ")}...</h2>
-<p>Dear Subscriber,</p>
-<p>${prompt}</p>
-<p>We hope you find this information valuable. Please don't hesitate to reach out if you have any questions.</p>
-<p>Best regards,<br>The Team</p>`;
-        }
-
-        // Generate a few variations
-        const variations = [
-          generatedContent,
-          generatedContent
-            .replace("Dear Subscriber", "Hello there")
-            .replace("Best regards", "Cheers"),
-          generatedContent
-            .replace("<h2>", "<h2>🚀 ")
-            .replace("<p>Best regards", "<p>Thank you for your time,"),
-        ];
-
-        setSuggestions(variations);
-        toast({
-          title: "Content generated (fallback)",
-          description:
-            "AI has created content based on your instructions using local generation.",
-        });
-      } catch (fallbackError) {
-        console.error("Fallback generation also failed:", fallbackError);
-        toast({
-          variant: "destructive",
-          title: "Generation failed",
-          description: "Failed to generate content. Please try again.",
-        });
-      }
+      toast({
+        variant: "destructive",
+        title: "Generation failed",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectSuggestion = (content: string) => {
-    onSelectContent(content);
-    toast({
-      title: "Content applied",
-      description: "The selected content has been applied to your email.",
-    });
+  const generateSubjects = async () => {
+    if (!currentContent.trim()) {
+      toast({
+        variant: "destructive",
+        title: "No email body",
+        description: "Write content first, then suggest subjects.",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const list = await suggestSubjects({
+        content: currentContent,
+        subject: currentSubject,
+        tone: "professional",
+      });
+      setSubjects(list);
+      toast({
+        title: "Subjects ready",
+        description: `${list.length} options generated.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Subject suggestions failed",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <div className="text-sm text-muted-foreground mb-2">
-          Tell the AI what kind of email content you want to create:
-        </div>
-        <Textarea
-          placeholder="E.g., Create a welcome email for new subscribers that introduces our product and offers a 10% discount"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          className="min-h-[100px]"
-        />
-        <Button
-          onClick={generateContent}
-          disabled={loading || !prompt.trim()}
-          className="w-full"
-        >
-          {loading ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Generate Content
-            </>
-          )}
-        </Button>
-      </div>
+      <Tabs defaultValue="content">
+        <TabsList className="h-8 w-full">
+          <TabsTrigger value="content" className="flex-1 text-xs">
+            Body
+          </TabsTrigger>
+          <TabsTrigger value="subjects" className="flex-1 text-xs">
+            Subjects
+          </TabsTrigger>
+        </TabsList>
 
-      {suggestions.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium">AI Suggestions</h4>
+        <TabsContent value="content" className="mt-3 space-y-3">
+          <Textarea
+            placeholder="Brief: welcome new subscribers, soft CTA to book a demo…"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="min-h-[100px] text-sm"
+          />
+          <Button
+            onClick={generateContent}
+            disabled={loading || !prompt.trim()}
+            className="w-full"
+            size="sm"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              "Generate draft"
+            )}
+          </Button>
+
           {suggestions.map((suggestion, index) => (
-            <Card
-              key={`suggestion-${index}-${suggestion.slice(0, 24)}`}
-              className="p-3 hover:bg-muted/50 cursor-pointer"
+            <div
+              key={index}
+              className="space-y-2 rounded-md border border-border bg-background p-3"
             >
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center">
-                  <Lightbulb className="h-4 w-4 mr-2 text-amber-500" />
-                  <span className="text-sm font-medium">
-                    Suggestion {index + 1}
-                  </span>
-                </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Draft
+                </span>
                 <Button
                   size="sm"
-                  variant="ghost"
-                  onClick={() => handleSelectSuggestion(suggestion)}
+                  variant="secondary"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    onSelectContent(suggestion);
+                    toast({ title: "Applied to body" });
+                  }}
                 >
-                  <Check className="h-4 w-4 mr-1" /> Use This
+                  <Check className="mr-1 h-3.5 w-3.5" />
+                  Use
                 </Button>
               </div>
               <div
-                className="text-sm prose prose-sm max-w-none overflow-hidden max-h-[150px] text-muted-foreground"
+                className="email-preview-body max-h-[160px] overflow-hidden text-sm text-muted-foreground"
                 dangerouslySetInnerHTML={{ __html: suggestion }}
               />
-            </Card>
+            </div>
           ))}
-        </div>
-      )}
+        </TabsContent>
 
-      <div className="text-xs text-muted-foreground mt-4">
-        <p className="mb-1">
-          💡 <strong>Tips for better results:</strong>
-        </p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Be specific about your audience and purpose</li>
-          <li>
-            Mention any specific tone or style you want (formal, friendly, etc.)
-          </li>
-          <li>Include key points you want to highlight</li>
-          <li>Specify any calls-to-action you want to include</li>
-        </ul>
-      </div>
+        <TabsContent value="subjects" className="mt-3 space-y-3">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Suggest subject lines from the current body. Apply one here or copy
+            into A/B Testing.
+          </p>
+          <Button
+            onClick={generateSubjects}
+            disabled={loading}
+            className="w-full"
+            size="sm"
+            variant="secondary"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+                Suggesting…
+              </>
+            ) : (
+              "Suggest subjects"
+            )}
+          </Button>
+          {subjects.map((s, i) => (
+            <div
+              key={i}
+              className="flex items-start justify-between gap-2 rounded-md border border-border bg-background p-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-snug">{s.subject}</p>
+                {s.preview ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {s.preview}
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 shrink-0 text-xs"
+                onClick={() => {
+                  onSelectSubject(s.subject);
+                  toast({ title: "Subject applied" });
+                }}
+              >
+                Use
+              </Button>
+            </div>
+          ))}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -1,13 +1,16 @@
-// Web scraping via server /api/scrape proxy (provider key is server-side only).
+// Web scraping via server /api/scrape proxy (Firecrawl v2). AI is never used to invent leads.
 
 import type { Lead } from "@/types/lead";
+import { formatLeads, type ScrapedLeadSource } from "./groq-api";
 import { scrapeApiRequest } from "./scrape-api";
 import {
   contactsToLeads,
   extractContactsFromContent,
+  jsonContactsToLeads,
   mergeLeadsByEmail,
   normalizeUrl,
   parseMapLinks,
+  parseSearchResultUrls,
   pickContactPageUrls,
 } from "./scrape-extract";
 
@@ -17,6 +20,7 @@ type ScrapePageData = {
   text?: string;
   links?: string[];
   content?: string;
+  json?: unknown;
 };
 
 type ScrapeApiBody = {
@@ -24,8 +28,29 @@ type ScrapeApiBody = {
   error?: string;
   data?: unknown;
   links?: unknown;
+  web?: unknown;
   results?: unknown;
   [key: string]: unknown;
+};
+
+const CONTACT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    contacts: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          title: { type: "string" },
+          company: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+          linkedin: { type: "string" },
+        },
+      },
+    },
+  },
 };
 
 function scrapeError(data: ScrapeApiBody, fallback: string): string {
@@ -33,12 +58,19 @@ function scrapeError(data: ScrapeApiBody, fallback: string): string {
   if (typeof err === "string" && err.trim()) return err;
   return fallback;
 }
+
+function asPageData(data: unknown): ScrapePageData {
+  if (!data || typeof data !== "object") return {};
+  return data as ScrapePageData;
+}
+
 async function mapWebsite(url: string): Promise<string[]> {
   const data = await scrapeApiRequest("map", {
     body: {
       url: normalizeUrl(url),
       includeSubdomains: false,
       limit: 50,
+      search: "contact team about people leadership",
     },
   });
 
@@ -53,7 +85,16 @@ async function scrapePage(url: string): Promise<ScrapePageData> {
   const data = await scrapeApiRequest("scrape", {
     body: {
       url: normalizeUrl(url),
-      formats: ["markdown", "html", "links"],
+      formats: [
+        "markdown",
+        "links",
+        {
+          type: "json",
+          schema: CONTACT_JSON_SCHEMA,
+          prompt:
+            "Extract only real contact people and emails visible on this page. Do not invent contacts.",
+        },
+      ],
       onlyMainContent: false,
     },
   });
@@ -62,19 +103,69 @@ async function scrapePage(url: string): Promise<ScrapePageData> {
     throw new Error(scrapeError(data, `Could not scrape ${url}`));
   }
 
-  return data.data as ScrapePageData;
+  return asPageData(data.data);
 }
 
-/** Scrape a website for contacts; optionally maps contact/about/team pages first. */
+function pageToLeads(pageUrl: string, data: ScrapePageData, maxLeads: number): Lead[] {
+  const fromJson = jsonContactsToLeads(pageUrl, data.json, maxLeads);
+  const contacts = extractContactsFromContent(
+    {
+      html: data.html,
+      markdown: data.markdown,
+      text: data.text,
+      links: data.links,
+    },
+    { prioritizeSections: true },
+  );
+  const fromRegex = contactsToLeads(pageUrl, contacts, maxLeads);
+  return mergeLeadsByEmail([...fromJson, ...fromRegex]).slice(0, maxLeads);
+}
+
+async function optionallyFormat(
+  sources: ScrapedLeadSource[],
+  seedLeads: Lead[],
+): Promise<Lead[]> {
+  if (sources.length === 0) return seedLeads;
+  try {
+    const formatted = await formatLeads(sources);
+    if (!formatted.length) return seedLeads;
+    // Keep only emails that already appeared in scraped seed (anti-invention).
+    const allowed = new Set(
+      seedLeads
+        .map((l) => l.email?.toLowerCase().trim())
+        .filter(Boolean) as string[],
+    );
+    const safe = formatted
+      .map((l, i) => ({
+        ...l,
+        id: l.id || `fmt-${Date.now()}-${i}`,
+        email: (l.email || "").toLowerCase().trim(),
+        website: l.website || sources[0]?.sourceUrl,
+      }))
+      .filter((l) => {
+        if (!l.email) return false;
+        if (allowed.size === 0) return Boolean(l.email);
+        return allowed.has(l.email);
+      });
+    return safe.length > 0 ? mergeLeadsByEmail(safe) : seedLeads;
+  } catch (err) {
+    console.warn("format_leads skipped:", err);
+    return seedLeads;
+  }
+}
+
+/** Scrape a website for contacts; maps contact/about/team pages when deepScan. */
 export async function scrapeWebsiteForLeads(
   url: string,
   options: {
     depth?: number;
     maxLeads?: number;
     deepScan?: boolean;
+    useAiFormat?: boolean;
   } = {},
 ): Promise<Lead[]> {
-  const { depth = 1, maxLeads = 10, deepScan = false } = options;
+  const { depth = 1, maxLeads = 10, deepScan = false, useAiFormat = true } =
+    options;
   const formatted = normalizeUrl(url);
   const urlsToScrape = [formatted];
 
@@ -89,22 +180,18 @@ export async function scrapeWebsiteForLeads(
 
   const uniqueUrls = [...new Set(urlsToScrape)].slice(0, 6);
   const allLeads: Lead[] = [];
+  const sources: ScrapedLeadSource[] = [];
   let lastError: string | null = null;
 
   for (const pageUrl of uniqueUrls) {
     try {
       const data = await scrapePage(pageUrl);
-      const contacts = extractContactsFromContent(
-        {
-          html: data.html,
-          markdown: data.markdown,
-          text: data.text,
-          links: data.links,
-        },
-        { prioritizeSections: true },
-      );
-
-      allLeads.push(...contactsToLeads(pageUrl, contacts, maxLeads));
+      sources.push({
+        sourceUrl: pageUrl,
+        markdown: (data.markdown || data.text || "").slice(0, 20000),
+        json: data.json,
+      });
+      allLeads.push(...pageToLeads(pageUrl, data, maxLeads));
       if (allLeads.length >= maxLeads) break;
     } catch (err) {
       lastError = err instanceof Error ? err.message : "Scrape failed";
@@ -112,7 +199,11 @@ export async function scrapeWebsiteForLeads(
     }
   }
 
-  const merged = mergeLeadsByEmail(allLeads).slice(0, maxLeads);
+  let merged = mergeLeadsByEmail(allLeads).slice(0, maxLeads);
+  if (useAiFormat && (merged.length > 0 || sources.some((s) => s.markdown))) {
+    merged = (await optionallyFormat(sources, merged)).slice(0, maxLeads);
+  }
+
   if (merged.length === 0 && lastError) {
     throw new Error(lastError);
   }
@@ -131,7 +222,10 @@ export async function scrapeUrlBatch(
     const batch = urls.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map((u) =>
-        scrapeWebsiteForLeads(u, { ...options, maxLeads: options.maxLeads ?? 5 }),
+        scrapeWebsiteForLeads(u, {
+          ...options,
+          maxLeads: options.maxLeads ?? 5,
+        }),
       ),
     );
 
@@ -151,7 +245,7 @@ export async function scrapeUrlBatch(
 
 export async function scrapeDomainBatch(domains: string[]): Promise<Lead[]> {
   const urls = domains.map((d) => normalizeUrl(d));
-  return scrapeUrlBatch(urls, { maxLeads: 3, deepScan: true });
+  return scrapeUrlBatch(urls, { maxLeads: 5, deepScan: true });
 }
 
 export async function searchAndScrapeLeads(
@@ -171,7 +265,10 @@ export async function searchAndScrapeLeads(
   const searchData = await scrapeApiRequest("search", {
     body: {
       query: searchQuery,
-      limit: maxResults,
+      limit: Math.min(maxResults, 8),
+      scrapeOptions: {
+        formats: ["markdown", "links"],
+      },
     },
   });
 
@@ -179,22 +276,11 @@ export async function searchAndScrapeLeads(
     throw new Error(scrapeError(searchData, "Web search failed"));
   }
 
-  const results =
-    (searchData.data as { results?: unknown[] } | undefined)?.results ||
-    (Array.isArray(searchData.data) ? searchData.data : null) ||
-    searchData.results ||
-    [];
-
-  if (!Array.isArray(results) || results.length === 0) return [];
-
-  const urls = results
-    .map((r: { url?: string; link?: string }) => r.url || r.link)
-    .filter(Boolean) as string[];
-
+  const urls = parseSearchResultUrls(searchData).slice(0, maxResults);
   if (urls.length === 0) return [];
 
-  return scrapeUrlBatch(urls.slice(0, maxResults), {
+  return scrapeUrlBatch(urls, {
     maxLeads: Math.max(2, Math.ceil(maxResults / urls.length)),
-    deepScan: false,
+    deepScan: true,
   }).then((leads) => leads.slice(0, maxResults));
 }

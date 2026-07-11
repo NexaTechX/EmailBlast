@@ -22,7 +22,8 @@ export function sendTestEmail(campaign: Campaign, testEmail: string) {
   return postJson("/api/send-test", {
     subject: `[TEST] ${campaign.subject}`,
     html: campaign.content,
-    from: campaign.sender_email,
+    senderName: campaign.sender_name,
+    replyTo: campaign.sender_email,
     to: testEmail,
   });
 }

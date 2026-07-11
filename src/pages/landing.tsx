@@ -1,4 +1,5 @@
 import { Hero } from "@/components/landing/hero";
+import { TrustedBy } from "@/components/landing/trusted-by";
 import { SocialProof } from "@/components/landing/social-proof";
 import { Features } from "@/components/landing/features";
 import { HowItWorks } from "@/components/landing/how-it-works";
@@ -20,6 +21,7 @@ export default function LandingPage() {
       <SiteHeader />
       <main className="pt-16">
         <Hero onGetStarted={handleGetStarted} />
+        <TrustedBy />
         <SocialProof />
         <div id="features">
           <Features />

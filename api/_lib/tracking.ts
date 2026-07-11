@@ -26,7 +26,17 @@ function rewriteLinks(
       if (SKIP_LINK_PREFIXES.some((p) => url.toLowerCase().startsWith(p))) {
         return match;
       }
-      const trackUrl = `${base}/api/track/click?cid=${enc(campaignId)}&e=${enc(email)}&url=${enc(url)}&t=${enc(token)}`;
+      let isConversion = false;
+      try {
+        const parsed = new URL(url);
+        isConversion =
+          parsed.searchParams.get("eb_convert") === "1" ||
+          parsed.searchParams.get("convert") === "1";
+      } catch {
+        isConversion = /[?&](eb_convert|convert)=1/i.test(url);
+      }
+      const path = isConversion ? "conversion" : "click";
+      const trackUrl = `${base}/api/track/${path}?cid=${enc(campaignId)}&e=${enc(email)}&url=${enc(url)}&t=${enc(token)}`;
       return `href="${trackUrl}"`;
     },
   );

@@ -15,8 +15,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { getCampaigns, getSubscribers } from "@/lib/api";
 import { sendCampaign } from "@/lib/resend";
+import { suggestSubjects } from "@/lib/groq-api";
 import type { Campaign } from "@/types";
-import { Plus, Trash2, Play, Trophy } from "lucide-react";
+import { Plus, Trash2, Play, Trophy, Sparkles } from "lucide-react";
 
 interface Variant {
   id: string;
@@ -335,6 +336,54 @@ export function ABTestingTool() {
               <Button variant="outline" size="sm" onClick={addVariant}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add variant
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading || !selectedCampaignId}
+                onClick={async () => {
+                  const campaign = campaigns.find(
+                    (c) => c.id === selectedCampaignId,
+                  );
+                  if (!campaign?.content) {
+                    toast({
+                      variant: "destructive",
+                      title: "No content",
+                      description: "Pick a campaign with email body content.",
+                    });
+                    return;
+                  }
+                  setLoading(true);
+                  try {
+                    const list = await suggestSubjects({
+                      content: campaign.content,
+                      subject: campaign.subject,
+                    });
+                    if (!list.length) throw new Error("No suggestions returned");
+                    setVariants((prev) =>
+                      prev.map((v, i) => ({
+                        ...v,
+                        subject: list[i]?.subject || v.subject,
+                      })),
+                    );
+                    toast({
+                      title: "Subjects filled",
+                      description: "Review AI suggestions before running the test.",
+                    });
+                  } catch (err) {
+                    toast({
+                      variant: "destructive",
+                      title: "Suggest failed",
+                      description:
+                        err instanceof Error ? err.message : "Try again",
+                    });
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                AI fill subjects
               </Button>
             </div>
 

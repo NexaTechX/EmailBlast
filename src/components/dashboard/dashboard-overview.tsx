@@ -12,6 +12,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { WelcomeModal } from "@/components/onboarding/welcome-modal";
 import type { Campaign } from "@/types";
+import {
+  FREE_MONTHLY_EMAIL_LIMIT,
+  FREE_SUBSCRIBER_LIMIT,
+} from "@/lib/plan-limits";
+import {
+  countActiveSubscribers,
+  countEmailsSentThisMonth,
+} from "@/lib/quota";
 
 interface DashboardStats {
   totalCampaigns: number;
@@ -20,6 +28,7 @@ interface DashboardStats {
   activeSubscribers: number;
   averageOpenRate: number;
   averageClickRate: number;
+  emailsSentThisMonth: number;
 }
 
 export function DashboardOverview() {
@@ -31,6 +40,7 @@ export function DashboardOverview() {
     activeSubscribers: 0,
     averageOpenRate: 0,
     averageClickRate: 0,
+    emailsSentThisMonth: 0,
   });
   const [recentCampaigns, setRecentCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +99,11 @@ export function DashboardOverview() {
       const clickRate =
         uniqueOpens.size > 0 ? (uniqueClicks.size / uniqueOpens.size) * 100 : 0;
 
+      const [activeCount, emailsThisMonth] = await Promise.all([
+        countActiveSubscribers(),
+        countEmailsSentThisMonth(),
+      ]);
+
       setStats({
         totalCampaigns: totalCampaigns || 0,
         activeCampaigns:
@@ -96,9 +111,10 @@ export function DashboardOverview() {
             (c) => c.status === "scheduled" || c.status === "sending",
           ).length || 0,
         totalSubscribers: subscribers?.length || 0,
-        activeSubscribers: activeSubscribers.length,
+        activeSubscribers: activeCount || activeSubscribers.length,
         averageOpenRate: Math.round(openRate * 10) / 10,
         averageClickRate: Math.round(clickRate * 10) / 10,
+        emailsSentThisMonth: emailsThisMonth,
       });
 
       setRecentCampaigns((campaigns || []) as Campaign[]);
@@ -136,23 +152,20 @@ export function DashboardOverview() {
     },
     {
       label: "Subscribers",
-      value: stats.activeSubscribers,
-      sub:
-        stats.totalSubscribers !== stats.activeSubscribers
-          ? `${stats.totalSubscribers - stats.activeSubscribers} unsubscribed`
-          : "Active",
+      value: `${stats.activeSubscribers}/${FREE_SUBSCRIBER_LIMIT}`,
+      sub: `${Math.max(0, FREE_SUBSCRIBER_LIMIT - stats.activeSubscribers)} slots left`,
       to: "/app/subscribers",
+    },
+    {
+      label: "Emails this month",
+      value: `${stats.emailsSentThisMonth}/${FREE_MONTHLY_EMAIL_LIMIT}`,
+      sub: `${Math.max(0, FREE_MONTHLY_EMAIL_LIMIT - stats.emailsSentThisMonth)} remaining`,
+      to: "/app/analytics",
     },
     {
       label: "Open rate",
       value: `${stats.averageOpenRate}%`,
       sub: "Unique opens / sent",
-      to: "/app/analytics",
-    },
-    {
-      label: "Click rate",
-      value: `${stats.averageClickRate}%`,
-      sub: "Unique clicks / opens",
       to: "/app/analytics",
     },
   ];

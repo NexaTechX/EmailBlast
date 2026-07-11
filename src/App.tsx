@@ -28,16 +28,45 @@ import { SecuritySettings } from "./components/security/security-settings";
 import { DocumentationCenter } from "./components/documentation/documentation-center";
 import { ABTestingTool } from "./components/ab-testing/ab-testing-tool";
 import { LeadFinderTool } from "./components/lead-finder/lead-finder-tool";
+import { AutomationsTool } from "./components/automations/automations-tool";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading…</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
-    return <Navigate to="/auth" />;
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AuthRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/app" replace />;
   }
 
   return <>{children}</>;
@@ -53,7 +82,14 @@ function App() {
           {import.meta.env.VITE_TEMPO === "true" && tempoRoutes}
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/auth" element={<AuthPage />} />
+            <Route
+              path="/auth"
+              element={
+                <AuthRoute>
+                  <AuthPage />
+                </AuthRoute>
+              }
+            />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/legal/terms" element={<TermsOfService />} />
@@ -85,6 +121,7 @@ function App() {
                         }
                       />
                       <Route path="/ab-testing" element={<ABTestingTool />} />
+                      <Route path="/automations" element={<AutomationsTool />} />
                       <Route path="/lead-finder" element={<LeadFinderTool />} />
                       <Route path="/settings" element={<SettingsLayout />}>
                         <Route index element={<ProfileSettings />} />

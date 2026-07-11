@@ -2,16 +2,16 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
 import { sql } from "../_lib/db";
 import { injectTracking, APP_URL } from "../_lib/tracking";
+import { maybeNotifyCampaignSent } from "../_lib/notify";
+import {
+  assertCanSendEmails,
+  FREE_MONTHLY_EMAIL_LIMIT,
+} from "../_lib/plan-limits";
+import { applyMergeTags } from "../_lib/merge-tags";
+import { buildSendIdentity } from "../_lib/resend-from";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const isProd = process.env.NODE_ENV === "production";
-
-function formatFrom(senderName: string | null, senderEmail: string): string {
-  const email = senderEmail.trim();
-  const name = senderName?.trim();
-  if (name) return `${name} <${email}>`;
-  return email;
-}
 
 // GET /api/cron/send-scheduled — process due scheduled campaigns (Vercel Cron).
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -36,8 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const due = await sql`
-      select c.id, c.subject, c.content, c.sender_name, c.sender_email, c.list_id,
-             p.mailing_address
+      select c.id, c.user_id, c.subject, c.content, c.sender_name, c.sender_email, c.list_id,
+             p.mailing_address, p.default_sender_email
       from campaigns c
       left join profiles p on p.id = c.user_id
       where c.status = 'scheduled'
@@ -49,12 +49,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (const campaign of due as Array<{
       id: string;
+      user_id: string;
       subject: string;
       content: string;
       sender_name: string | null;
       sender_email: string;
       list_id: string | null;
       mailing_address: string | null;
+      default_sender_email: string | null;
     }>) {
       if (!campaign.list_id) {
         await sql`update campaigns set status = 'failed' where id = ${campaign.id}`;
@@ -78,33 +80,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const subs = await sql`
-        select email from subscribers
+        select email, first_name, last_name from subscribers
         where list_id = ${campaign.list_id}
           and unsubscribed_at is null
       `;
 
-      const recipients = (subs as Array<{ email: string }>).map((s) => s.email);
+      const subRows = subs as Array<{
+        email: string;
+        first_name: string | null;
+        last_name: string | null;
+      }>;
+      const recipients = subRows.map((s) => s.email);
       if (recipients.length === 0) {
         await sql`update campaigns set status = 'failed' where id = ${campaign.id}`;
         continue;
       }
 
-      const from = formatFrom(campaign.sender_name, campaign.sender_email);
-      const mailingAddress = campaign.mailing_address.trim();
+      try {
+        await assertCanSendEmails(campaign.user_id, recipients.length);
+      } catch (err) {
+        console.error(
+          `cron skip ${campaign.id}: monthly limit (${FREE_MONTHLY_EMAIL_LIMIT})`,
+          err,
+        );
+        await sql`update campaigns set status = 'failed' where id = ${campaign.id}`;
+        continue;
+      }
 
-      const messages = recipients.map((email) => ({
-        from,
-        to: email,
-        subject: campaign.subject,
-        html: injectTracking(
-          campaign.content,
-          campaign.id,
+      const identity = buildSendIdentity({
+        senderName: campaign.sender_name,
+        replyToEmail: campaign.sender_email,
+      });
+      const mailingAddress = campaign.mailing_address.trim();
+      const subByEmail = new Map(
+        subRows.map((s) => [s.email.toLowerCase(), s] as const),
+      );
+
+      const messages = recipients.map((email) => {
+        const sub = subByEmail.get(email.toLowerCase());
+        const personalized = applyMergeTags(campaign.content, {
           email,
-          APP_URL,
-          mailingAddress,
-        ),
-        tags: [{ name: "campaign_id", value: campaign.id }],
-      }));
+          first_name: sub?.first_name,
+          last_name: sub?.last_name,
+        });
+        return {
+          ...identity,
+          to: email,
+          subject: campaign.subject,
+          html: injectTracking(
+            personalized,
+            campaign.id,
+            email,
+            APP_URL,
+            mailingAddress,
+          ),
+          tags: [{ name: "campaign_id", value: campaign.id }],
+        };
+      });
 
       let sentCount = 0;
       let batchFailed = false;
@@ -150,6 +182,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         set status = 'sent', sent_at = now()
         where id = ${campaign.id}
       `;
+      await maybeNotifyCampaignSent({
+        userId: campaign.user_id,
+        notifyEmail:
+          campaign.default_sender_email || campaign.sender_email,
+        campaignId: campaign.id,
+        subject: campaign.subject,
+        sentCount,
+      });
       processed++;
     }
 

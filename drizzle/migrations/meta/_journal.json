@@ -8,6 +8,34 @@
       "when": 1782475454351,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782476000000,
+      "tag": "0001_sent_event_and_auth_grant",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782477000000,
+      "tag": "0002_profile_sending_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783760000000,
+      "tag": "0003_open_dedupe_and_enrollments",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783773000000,
+      "tag": "0004_fix_empty_rls_policies",
+      "breakpoints": true
     }
   ]
 }

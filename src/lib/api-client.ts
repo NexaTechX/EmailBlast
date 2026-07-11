@@ -16,13 +16,25 @@ export async function authHeaders(): Promise<Record<string, string>> {
 
 export async function postJson(path: string, body: unknown) {
   const headers = await authHeaders();
-  const res = await fetch(path, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(
+      `Could not reach ${path}. For local /api routes, run \`npm run dev:api\` in a second terminal.`,
+    );
+  }
+  const detail = await res.text().catch(() => "");
   if (!res.ok) {
-    const detail = await res.text().catch(() => "");
+    if (!detail) {
+      throw new Error(
+        `Request failed (${res.status}). If this is /api/*, start the API with \`npm run dev:api\`.`,
+      );
+    }
     try {
       const parsed = JSON.parse(detail) as { error?: string };
       throw new Error(parsed.error || detail || `Request failed (${res.status})`);
@@ -31,5 +43,10 @@ export async function postJson(path: string, body: unknown) {
       throw new Error(detail || `Request failed (${res.status})`);
     }
   }
-  return res.json();
+  if (!detail) return {};
+  try {
+    return JSON.parse(detail);
+  } catch {
+    throw new Error(`Invalid JSON response from ${path}`);
+  }
 }

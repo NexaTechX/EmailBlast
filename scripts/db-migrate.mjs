@@ -42,7 +42,7 @@ for (const file of files) {
       await sql.query(statement);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/already exists|duplicate column/i.test(msg)) {
+      if (/already exists|duplicate column|duplicate_object|duplicate key/i.test(msg)) {
         console.log("  (skipped — already applied)");
       } else {
         console.error(`  Failed: ${msg}`);

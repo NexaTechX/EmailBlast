@@ -12,16 +12,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { saveLeads, getLeads, searchLeads, Lead } from "./lead-database";
 import { ensureDefaultSubscriberList } from "@/lib/api";
+import { formatLeads } from "@/lib/groq-api";
 import {
-  generateLeads,
-  enrichLeads,
-  generateDomainLeads,
-} from "@/lib/groq-api";
-import {
-  scrapeWebsiteForLeads,
   scrapeDomainBatch,
   searchAndScrapeLeads,
 } from "@/lib/firecrawl";
+import { assertCanAddSubscribers } from "@/lib/quota";
 import { WebScraper } from "./web-scraper";
 import {
   Search,
@@ -168,123 +164,50 @@ export function LeadFinderTool() {
         console.log("Web scrape leads:", webLeads.length);
       } catch (scrapeError) {
         console.error("Web scrape error:", scrapeError);
+        toast({
+          variant: "destructive",
+          title: "Web scrape failed",
+          description:
+            scrapeError instanceof Error
+              ? scrapeError.message
+              : "Could not scrape leads.",
+        });
       }
 
       if (webLeads.length > 0) {
         try {
           await saveLeads(webLeads);
-          console.log("Saved web scrape leads to database");
-
           setSearchResults(webLeads);
+          setActiveTab("results");
           toast({
-            title: "Web scraping complete",
-            description: `Found ${webLeads.length} leads from web scraping matching your criteria.`,
+            title: "Search complete",
+            description: `Found ${webLeads.length} contacts from public pages via Firecrawl.`,
           });
           setSearching(false);
           return;
         } catch (saveError) {
           console.error("Error saving scraped leads to database:", saveError);
+          setSearchResults(webLeads);
+          setActiveTab("results");
         }
       }
 
-      // Fall back to AI if web scraping returned no results
-      let resultLeads: Lead[] = [];
-      let aiLeads: Lead[] = [];
-      try {
-        toast({
-          title: "Using AI generation",
-          description: "Generating leads with AI...",
-        });
-
-        aiLeads = await generateLeads(enhancedQuery, 10);
-      } catch (aiError) {
-        console.error("AI lead generation error:", aiError);
-      }
-
-      if (aiLeads.length > 0) {
-        resultLeads = aiLeads;
-        resultLeads = resultLeads.map((lead, index) => ({
-          ...lead,
-          id: lead.id || `ai-${Date.now()}-${index}`,
-        }));
-
-        try {
-          await saveLeads(resultLeads as Lead[]);
-          console.log("Saved AI-generated leads to database");
-        } catch (saveError) {
-          console.error("Error saving AI leads to database:", saveError);
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "No leads found",
-          description:
-            "Could not find leads via web scraping or AI. Try a different query or check your API keys.",
-        });
-        resultLeads = [];
-      }
-
-      // Filter leads based on search query and filters
-      const filteredLeads = resultLeads.filter((lead) => {
-        const searchLower = searchQuery.toLowerCase();
-        const matchesSearch = searchQuery
-          ? lead.name?.toLowerCase().includes(searchLower) ||
-            lead.company?.toLowerCase().includes(searchLower) ||
-            lead.title?.toLowerCase().includes(searchLower) ||
-            lead.industry?.toLowerCase().includes(searchLower) ||
-            lead.location?.toLowerCase().includes(searchLower)
-          : true;
-
-        // Apply additional filters
-        const matchesIndustry =
-          !industryFilter ||
-          (lead.industry &&
-            lead.industry.toLowerCase().includes(industryFilter.toLowerCase()));
-        const matchesSize =
-          !sizeFilter ||
-          (lead.employees &&
-            (typeof lead.employees === "string"
-              ? lead.employees.includes(sizeFilter)
-              : String(lead.employees).includes(sizeFilter)));
-        const matchesJobTitle =
-          !jobTitleFilter ||
-          (lead.title &&
-            lead.title.toLowerCase().includes(jobTitleFilter.toLowerCase()));
-        const matchesCountry =
-          !countryFilter ||
-          (lead.location &&
-            lead.location.includes(
-              countryFilter === "us"
-                ? "US"
-                : countryFilter === "ca"
-                  ? "Canada"
-                  : countryFilter === "uk"
-                    ? "UK"
-                    : countryFilter === "au"
-                      ? "Australia"
-                      : "",
-            ));
-
-        return (
-          matchesSearch &&
-          matchesIndustry &&
-          matchesSize &&
-          matchesJobTitle &&
-          matchesCountry
-        );
-      });
-
-      setSearchResults(filteredLeads);
       toast({
-        title: "Search complete",
-        description: `Found ${filteredLeads.length} potential leads matching your criteria.`,
+        variant: "destructive",
+        title: "No contacts found",
+        description:
+          "Firecrawl did not find contact emails on matching pages. Try a different query or scrape a company domain.",
       });
+      setSearchResults([]);
     } catch (error) {
       console.error("Search error:", error);
       toast({
         variant: "destructive",
         title: "Search failed",
-        description: "An error occurred while searching for leads.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred while searching for leads.",
       });
     } finally {
       setSearching(false);
@@ -333,99 +256,52 @@ export function LeadFinderTool() {
         console.log("Web scraped leads:", scrapedLeads.length);
       } catch (scrapeError) {
         console.error("Web scrape error:", scrapeError);
+        toast({
+          variant: "destructive",
+          title: "Domain scrape failed",
+          description:
+            scrapeError instanceof Error
+              ? scrapeError.message
+              : "Could not scrape domains.",
+        });
       }
 
       if (scrapedLeads.length > 0) {
-        // Save the scraped leads to the database
         try {
           await saveLeads(scrapedLeads as Lead[]);
-          console.log("Saved scraped leads to database");
-
           setSearchResults(scrapedLeads);
           setActiveTab("results");
-
-          // Update progress
           setBulkProgress(100);
-
           toast({
-            title: "Web scraping complete",
-            description: `Found ${scrapedLeads.length} leads from ${domains.length} domains through web scraping.`,
+            title: "Domain scrape complete",
+            description: `Found ${scrapedLeads.length} contacts from ${domains.length} domain(s) via Firecrawl.`,
           });
-
           setBulkSearching(false);
           return;
         } catch (saveError) {
           console.error("Error saving scraped leads to database:", saveError);
+          setSearchResults(scrapedLeads);
+          setActiveTab("results");
         }
       }
 
-      // Fall back to AI if web scraping returned no results
-      let generatedLeads = [];
-      try {
-        toast({
-          title: "Using AI generation",
-          description: "Generating leads with AI for the provided domains...",
-        });
-
-        // Process domains in batches to avoid hitting API limits
-        const batchSize = 5; // Process 5 domains at a time
-        for (let i = 0; i < domains.length; i += batchSize) {
-          const domainBatch = domains.slice(i, i + batchSize);
-
-          // Update progress for API call start
-          const startProgress = 50 + Math.round((i / domains.length) * 40);
-          setBulkProgress(startProgress);
-
-          // Get leads for this batch of domains
-          const batchLeads = await generateDomainLeads(domainBatch);
-          generatedLeads = [...generatedLeads, ...batchLeads];
-
-          // Update progress after batch is processed
-          const endProgress =
-            50 + Math.round(((i + domainBatch.length) / domains.length) * 40);
-          setBulkProgress(endProgress);
-        }
-      } catch (aiError) {
-        console.error("AI domain lead generation error:", aiError);
-      }
-
-      if (generatedLeads.length === 0) {
-        toast({
-          variant: "destructive",
-          title: "No leads found",
-          description:
-            "Could not generate leads for these domains. Try different domains or check your API configuration.",
-        });
-      }
-
-      // Add IDs to the leads if they don't have them
-      const finalLeads = generatedLeads.map((lead, index) => ({
-        ...lead,
-        id: lead.id || `domain-${Date.now()}-${index}`,
-      }));
-
-      // Save the domain leads to the database for future searches
-      try {
-        if (finalLeads.length > 0) {
-          await saveLeads(finalLeads as Lead[]);
-          console.log("Saved domain leads to database");
-        }
-      } catch (saveError) {
-        console.error("Error saving domain leads to database:", saveError);
-      }
-
-      setSearchResults(finalLeads);
-      setActiveTab("results");
       toast({
-        title: "Bulk search complete",
-        description: `Found ${finalLeads.length} leads from ${domains.length} domains.`,
+        variant: "destructive",
+        title: "No contacts found",
+        description:
+          "No public contact emails were found on these domains. Try About/Contact/Team pages.",
       });
+      setSearchResults([]);
+      setBulkProgress(100);
     } catch (error) {
       console.error("Bulk search error:", error);
       toast({
         variant: "destructive",
         title: "Bulk search failed",
-        description: "An error occurred while searching for leads.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred while searching for leads.",
       });
     } finally {
       setBulkSearching(false);
@@ -445,7 +321,7 @@ export function LeadFinderTool() {
     if (selectedLeads.length === 0) return;
 
     const confirmed = confirm(
-      "These leads are AI-generated or scraped samples and may not be verified contacts. Only add them if you have permission to email them. Continue?",
+      "These contacts were scraped from public web pages (Firecrawl). Scraped ≠ opted-in. Only import if you have a lawful basis to email them. Continue?",
     );
     if (!confirmed) return;
 
@@ -456,55 +332,55 @@ export function LeadFinderTool() {
       const leadsToAdd = selectedLeads
         .map((id) => {
           const lead = searchResults.find((l) => l.id === id);
-          if (!lead) return null;
+          if (!lead?.email) return null;
 
           return {
-            email: lead.email?.toLowerCase(),
+            email: lead.email.toLowerCase().trim(),
             list_id: defaultList.id,
             first_name: lead.name?.split(" ")[0] || "",
             last_name: lead.name?.split(" ").slice(1).join(" ") || "",
             tags: ["lead-finder"],
             metadata: {
-              source: "lead-finder",
+              source: "lead-finder-firecrawl",
               company: lead.company || "",
               job_title: lead.title || "",
               phone: lead.phone || "",
               industry: lead.industry,
               linkedin: lead.linkedin,
               website: lead.website,
-              // Include enriched data if available
-              ...(lead.education && { education: lead.education }),
-              ...(lead.previousCompanies && {
-                previous_companies: lead.previousCompanies,
-              }),
-              ...(lead.technologies && { technologies: lead.technologies }),
-              ...(lead.founded && { founded_year: lead.founded }),
-              ...(lead.revenue && { revenue: lead.revenue }),
-              ...(lead.confidenceScore && {
-                confidence_score: lead.confidenceScore,
-              }),
             },
           };
         })
-        .filter(Boolean); // Remove any null entries
+        .filter(Boolean);
 
       if (leadsToAdd.length === 0) {
-        throw new Error("No valid leads to add");
+        throw new Error("No leads with email addresses selected");
       }
+
+      await assertCanAddSubscribers(leadsToAdd.length);
 
       const { error } = await supabase.from("subscribers").upsert(leadsToAdd, {
         onConflict: "user_id,email",
         ignoreDuplicates: false,
       });
 
-      if (error) {
-        console.error("Supabase error adding leads:", error);
-        throw error;
+      if (error) throw error;
+
+      try {
+        const { enrollSubscribersInAutomations } = await import(
+          "@/lib/automations"
+        );
+        await enrollSubscribersInAutomations(
+          defaultList.id,
+          leadsToAdd.map((l) => (l as { email: string }).email),
+        );
+      } catch (enrollErr) {
+        console.warn("Automation enrollment skipped:", enrollErr);
       }
 
       toast({
-        title: "Leads added",
-        description: `${leadsToAdd.length} leads have been added to your subscriber list.`,
+        title: "Leads imported",
+        description: `${leadsToAdd.length} contact(s) added to your list (duplicates updated).`,
       });
 
       setSelectedLeads([]);
@@ -522,237 +398,77 @@ export function LeadFinderTool() {
     }
   };
 
-  const handleAIEnrichment = async () => {
+  const handleFormatWithAI = async () => {
     if (selectedLeads.length === 0) return;
 
     toast({
-      title: "AI Enrichment in progress",
-      description:
-        "Using AI to find additional contact information and details.",
+      title: "Formatting with AI",
+      description: "Cleaning scraped contact fields — no new contacts invented.",
     });
 
     try {
-      // Get confidence threshold setting
-      const confidenceThreshold =
-        (document.getElementById("confidence-threshold") as HTMLSelectElement)
-          ?.value || "medium";
-
-      // Create a copy of the search results
-      const enrichedResults = [...searchResults];
-
-      // Get the selected leads to enrich
-      const leadsToEnrich = enrichedResults.filter((lead) =>
-        selectedLeads.includes(lead.id),
+      const selected = searchResults.filter((l) =>
+        selectedLeads.includes(l.id),
       );
+      const allowed = new Set(
+        selected.map((l) => l.email?.toLowerCase().trim()).filter(Boolean),
+      );
+      const sources = selected.map((lead) => ({
+        sourceUrl: lead.website || lead.email || "scraped",
+        markdown: [
+          `name: ${lead.name || ""}`,
+          `title: ${lead.title || ""}`,
+          `company: ${lead.company || ""}`,
+          `email: ${lead.email || ""}`,
+          `phone: ${lead.phone || ""}`,
+          `linkedin: ${lead.linkedin || ""}`,
+          `website: ${lead.website || ""}`,
+          `location: ${lead.location || ""}`,
+          `industry: ${lead.industry || ""}`,
+        ].join("\n"),
+      }));
 
-      let aiEnrichedLeads: Lead[] = [];
-      try {
-        aiEnrichedLeads = await enrichLeads(leadsToEnrich);
-
-        if (aiEnrichedLeads.length > 0) {
-          for (const enrichedLead of aiEnrichedLeads) {
-            const index = enrichedResults.findIndex(
-              (lead) => lead.id === enrichedLead.id,
-            );
-            if (index !== -1) {
-              enrichedResults[index] = {
-                ...enrichedResults[index],
-                ...enrichedLead,
-                // Make sure we keep the original ID
-                id: enrichedResults[index].id,
-              };
-            }
-          }
-        }
-      } catch (aiError) {
-        console.error("AI enrichment error:", aiError);
+      const formatted = await formatLeads(sources);
+      const safe = formatted.filter(
+        (l) => l.email && allowed.has(l.email.toLowerCase().trim()),
+      );
+      if (safe.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Nothing to format",
+          description: "AI returned no safe updates for the selected contacts.",
+        });
+        return;
       }
 
-      if (aiEnrichedLeads.length === 0) {
-        // Enrich the selected leads
-        for (const id of selectedLeads) {
-          const index = enrichedResults.findIndex((lead) => lead.id === id);
-          if (index !== -1) {
-            // Generate more detailed and realistic information based on the lead's industry
-            const industry = (
-              enrichedResults[index].industry || ""
-            ).toLowerCase();
-
-            // Generate technologies based on industry
-            let technologies = [];
-            if (industry.includes("tech") || industry.includes("software")) {
-              technologies = [
-                "React",
-                "Node.js",
-                "AWS",
-                "MongoDB",
-                "Python",
-                "TypeScript",
-                "Docker",
-                "Kubernetes",
-              ];
-            } else if (industry.includes("health")) {
-              technologies = [
-                "Epic Systems",
-                "Cerner",
-                "MEDITECH",
-                "AWS Healthcare",
-                "Microsoft Azure",
-                "HIPAA Compliance Tools",
-              ];
-            } else if (industry.includes("finance")) {
-              technologies = [
-                "Bloomberg Terminal",
-                "Refinitiv Eikon",
-                "SAP",
-                "Oracle Financials",
-                "Tableau",
-                "Power BI",
-              ];
-            } else if (industry.includes("retail")) {
-              technologies = [
-                "Shopify",
-                "Magento",
-                "Salesforce Commerce",
-                "Square",
-                "NetSuite",
-                "Microsoft Dynamics",
-              ];
-            } else {
-              technologies = [
-                "Microsoft Office",
-                "Google Workspace",
-                "Slack",
-                "Zoom",
-                "Asana",
-                "Salesforce",
-              ];
-            }
-
-            // Generate company size and revenue based on employees
-            const employeeCount = enrichedResults[index].employees || "";
-            let revenue = "$1M-$5M";
-            let companySize = "Small Business";
-
-            if (typeof employeeCount === "string") {
-              if (employeeCount.includes("1-10")) {
-                revenue = "$500K-$2M";
-                companySize = "Startup";
-              } else if (employeeCount.includes("11-50")) {
-                revenue = "$2M-$10M";
-                companySize = "Small Business";
-              } else if (employeeCount.includes("51-200")) {
-                revenue = "$10M-$50M";
-                companySize = "Mid-size Company";
-              } else if (employeeCount.includes("201-500")) {
-                revenue = "$50M-$200M";
-                companySize = "Large Company";
-              } else if (employeeCount.includes("501+")) {
-                revenue = "$200M+";
-                companySize = "Enterprise";
-              }
-            }
-
-            // Generate founding year based on company size
-            let foundedYear;
-            if (companySize === "Startup") {
-              foundedYear = 2018 + Math.floor(Math.random() * 5); // 2018-2022
-            } else if (companySize === "Small Business") {
-              foundedYear = 2010 + Math.floor(Math.random() * 10); // 2010-2019
-            } else if (companySize === "Mid-size Company") {
-              foundedYear = 2000 + Math.floor(Math.random() * 15); // 2000-2014
-            } else {
-              foundedYear = 1980 + Math.floor(Math.random() * 30); // 1980-2009
-            }
-
-            // Generate direct phone and mobile based on area code in phone
-            const phone = enrichedResults[index].phone || "";
-            const areaCode =
-              phone.match && phone.match(/\(([^)]+)\)/)
-                ? phone.match(/\(([^)]+)\)/)[1]
-                : "555";
-
-            // Add additional information
-            enrichedResults[index] = {
-              ...enrichedResults[index],
-              linkedin:
-                enrichedResults[index].linkedin ||
-                `linkedin.com/in/${enrichedResults[index].name.toLowerCase().replace(/ /g, "-")}`,
-              twitter: `twitter.com/${enrichedResults[index].name.split(" ")[0].toLowerCase()}${Math.floor(Math.random() * 1000)}`,
-              revenue,
-              companySize,
-              founded: foundedYear.toString(),
-              technologies: technologies.slice(
-                0,
-                Math.floor(Math.random() * 5) + 2,
-              ),
-              directPhone: `+1 (${areaCode}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-              mobile: `+1 (${areaCode}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
-              personalEmail: `${enrichedResults[index].name.split(" ")[0].toLowerCase()}.${enrichedResults[index].name.split(" ")[1]?.toLowerCase() || "doe"}@gmail.com`,
-              education: [
-                "Stanford University",
-                "MIT",
-                "Harvard University",
-                "UC Berkeley",
-                "University of Michigan",
-                "NYU",
-              ][Math.floor(Math.random() * 6)],
-              previousCompanies: [
-                "Google",
-                "Microsoft",
-                "Amazon",
-                "Apple",
-                "Meta",
-                "IBM",
-                "Oracle",
-              ].slice(0, Math.floor(Math.random() * 3) + 1),
-              interests: [
-                "AI",
-                "Machine Learning",
-                "Blockchain",
-                "IoT",
-                "Digital Transformation",
-                "Cloud Computing",
-              ].slice(0, Math.floor(Math.random() * 4) + 1),
-              confidenceScore:
-                confidenceThreshold === "high"
-                  ? Math.floor(Math.random() * 10) + 90
-                  : confidenceThreshold === "medium"
-                    ? Math.floor(Math.random() * 20) + 70
-                    : Math.floor(Math.random() * 30) + 50,
-            };
-          }
-        }
-      }
-
-      // Update the search results with the enriched data
-      setSearchResults(enrichedResults);
-
-      // Save the enriched leads to the database
-      try {
-        // Get only the selected leads that were enriched
-        const enrichedLeadsToSave = enrichedResults.filter((lead) =>
-          selectedLeads.includes(lead.id),
+      const next = searchResults.map((lead) => {
+        const match = safe.find(
+          (f) =>
+            f.email?.toLowerCase() === lead.email?.toLowerCase() ||
+            selectedLeads.includes(lead.id),
         );
-
-        if (enrichedLeadsToSave.length > 0) {
-          await saveLeads(enrichedLeadsToSave as Lead[]);
-          console.log("Saved enriched leads to database");
-        }
-      } catch (saveError) {
-        console.error("Error saving enriched leads to database:", saveError);
-      }
-
+        if (!match || !selectedLeads.includes(lead.id)) return lead;
+        return {
+          ...lead,
+          name: match.name || lead.name,
+          title: match.title || lead.title,
+          company: match.company || lead.company,
+          phone: match.phone || lead.phone,
+          linkedin: match.linkedin || lead.linkedin,
+        };
+      });
+      setSearchResults(next);
+      await saveLeads(next.filter((l) => selectedLeads.includes(l.id)) as Lead[]);
       toast({
-        title: "Enrichment complete",
-        description: `Successfully enriched ${selectedLeads.length} leads with additional data.`,
+        title: "Format complete",
+        description: `Cleaned ${safe.length} scraped contact(s).`,
       });
     } catch (error) {
-      console.error("AI enrichment error:", error);
       toast({
         variant: "destructive",
-        title: "Enrichment failed",
-        description: "An error occurred while enriching the leads.",
+        title: "Format failed",
+        description:
+          error instanceof Error ? error.message : "Could not format leads.",
       });
     }
   };
@@ -1000,11 +716,11 @@ export function LeadFinderTool() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleAIEnrichment}
+                    onClick={handleFormatWithAI}
                     disabled={selectedLeads.length === 0}
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
-                    AI Enrich
+                    Format with AI
                   </Button>
                   <Button
                     variant="outline"
@@ -1252,74 +968,22 @@ export function LeadFinderTool() {
               </div>
             </div>
 
-            <div className="p-4 border rounded-md space-y-4">
-              <h4 className="font-medium">AI Enrichment Settings</h4>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="confidence-threshold" className="text-sm">
-                    Confidence Threshold
-                  </Label>
-                  <select
-                    id="confidence-threshold"
-                    className="text-sm p-1 border rounded"
-                  >
-                    <option value="high">High (90%+)</option>
-                    <option value="medium" selected>
-                      Medium (70%+)
-                    </option>
-                    <option value="low">Low (50%+)</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>Prioritize web scraping</span>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="data-points" className="text-sm">
-                    Required Data Points
-                  </Label>
-                  <select
-                    id="data-points"
-                    className="text-sm p-1 border rounded"
-                  >
-                    <option value="all">All (Email, Phone, etc.)</option>
-                    <option value="email">Email Only</option>
-                    <option value="minimal">Minimal (Name + Company)</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>Auto-verify email addresses</span>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </div>
+            <div className="p-4 border rounded-md space-y-3">
+              <h4 className="font-medium">How Lead Finder works</h4>
+              <p className="text-sm text-muted-foreground">
+                Contacts come from public pages via Firecrawl (search, map,
+                scrape). AI only formats scraped text — it never invents emails
+                or people. Scraped contacts are not opted-in subscribers.
+              </p>
             </div>
 
             <div className="p-4 border rounded-md space-y-4">
-              <h4 className="font-medium">Compliance Settings</h4>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>GDPR Compliance Mode</span>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>CCPA Compliance Mode</span>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>CAN-SPAM Compliance</span>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </div>
+              <h4 className="font-medium">Compliance reminder</h4>
+              <p className="text-sm text-muted-foreground">
+                You are responsible for having a lawful basis before emailing
+                scraped contacts. Prefer people who already opted in to your
+                list.
+              </p>
             </div>
           </div>
         </TabsContent>

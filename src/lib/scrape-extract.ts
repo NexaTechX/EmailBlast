@@ -191,6 +191,76 @@ export function parseMapLinks(data: unknown): string[] {
   return [];
 }
 
+/** Parse Firecrawl v2 /search response into page URLs. */
+export function parseSearchResultUrls(data: unknown): string[] {
+  if (!data || typeof data !== "object") return [];
+  const obj = data as Record<string, unknown>;
+  const buckets: unknown[] = [];
+
+  if (Array.isArray(obj.data)) buckets.push(...obj.data);
+  else if (obj.data && typeof obj.data === "object") {
+    const d = obj.data as Record<string, unknown>;
+    if (Array.isArray(d.web)) buckets.push(...d.web);
+    if (Array.isArray(d.results)) buckets.push(...d.results);
+  }
+  if (Array.isArray(obj.web)) buckets.push(...obj.web);
+  if (Array.isArray(obj.results)) buckets.push(...obj.results);
+
+  const urls: string[] = [];
+  for (const item of buckets) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { url?: string; link?: string; metadata?: { sourceURL?: string } };
+    const url = row.url || row.link || row.metadata?.sourceURL;
+    if (url) urls.push(url);
+  }
+  return [...new Set(urls)];
+}
+
+/** Convert Firecrawl JSON extraction contacts into Lead rows. */
+export function jsonContactsToLeads(
+  pageUrl: string,
+  json: unknown,
+  maxLeads: number,
+): Lead[] {
+  if (!json || typeof json !== "object") return [];
+  const root = json as Record<string, unknown>;
+  const list = Array.isArray(root.contacts)
+    ? root.contacts
+    : Array.isArray(json)
+      ? json
+      : [];
+  const company = companyFromUrl(pageUrl);
+  const leads: Lead[] = [];
+
+  for (let i = 0; i < list.length && leads.length < maxLeads; i++) {
+    const c = list[i];
+    if (!c || typeof c !== "object") continue;
+    const row = c as Record<string, unknown>;
+    const email = String(row.email || "")
+      .toLowerCase()
+      .trim();
+    const phone = String(row.phone || "").trim();
+    if (!email && !phone) continue;
+    if (email && filterValidEmails([email]).length === 0) continue;
+
+    leads.push({
+      id: `json-${Date.now()}-${i}`,
+      name: String(row.name || (email ? generateNameFromEmail(email) : "Contact")).trim(),
+      title: String(row.title || "Team Member").trim(),
+      company: String(row.company || company).trim(),
+      email,
+      phone,
+      linkedin: String(row.linkedin || "").trim(),
+      website: pageUrl,
+      industry: "Other",
+      employees: "Unknown",
+      location: "Unknown",
+      confidenceScore: email ? 80 : 60,
+    });
+  }
+  return leads;
+}
+
 export function generateNameFromEmail(email: string): string {
   if (!email.includes("@")) return "Unknown";
   const namePart = email.split("@")[0];

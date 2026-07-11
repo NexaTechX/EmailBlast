@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Webhook } from "svix";
 import { sql } from "../_lib/db";
 
+// Opens are recorded only by the tracking pixel (source of truth).
 const EVENT_MAP: Record<string, string> = {
-  "email.opened": "open",
   "email.clicked": "click",
   "email.bounced": "bounce",
   "email.complained": "unsubscribe",
@@ -91,21 +91,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     : JSON.stringify(event);
 
   try {
-    if (eventType === "open" && email) {
-      const existing = await sql`
-        select id from campaign_analytics
-        where campaign_id = ${campaignId}
-          and lower(email) = lower(${email as string})
-          and event_type = 'open'
-        limit 1
-      `;
-      if (existing.length > 0) {
-        return res.status(200).json({ ok: true, deduped: true });
+    if (eventType === "click" && email) {
+      const clickUrl =
+        typeof data.click === "object" && data.click !== null
+          ? String((data.click as { link?: string }).link || "")
+          : "";
+      if (clickUrl) {
+        const existing = await sql`
+          select id from campaign_analytics
+          where campaign_id = ${campaignId}
+            and lower(email) = lower(${email as string})
+            and event_type = 'click'
+            and metadata->>'url' = ${clickUrl}
+          limit 1
+        `;
+        if (existing.length > 0) {
+          return res.status(200).json({ ok: true, deduped: true });
+        }
       }
+      const clickMeta = JSON.stringify({
+        ...(variantId ? { variant_id: variantId } : {}),
+        ...(clickUrl ? { url: clickUrl } : {}),
+        source: "webhook",
+      });
+      await sql`insert into campaign_analytics (campaign_id, email, event_type, metadata)
+                values (${campaignId}, ${email as string}, 'click', ${clickMeta}::jsonb)`;
+    } else {
+      await sql`insert into campaign_analytics (campaign_id, email, event_type, metadata)
+                values (${campaignId}, ${email ?? null}, ${eventType}, ${metadata}::jsonb)`;
     }
-
-    await sql`insert into campaign_analytics (campaign_id, email, event_type, metadata)
-              values (${campaignId}, ${email ?? null}, ${eventType}, ${metadata}::jsonb)`;
 
     if (eventType === "unsubscribe" && email) {
       await sql`update subscribers set unsubscribed_at = now()

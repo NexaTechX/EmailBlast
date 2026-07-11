@@ -26,19 +26,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (cid && email && tokenValid(token, cid, email)) {
     try {
-      const existing = await sql`
-        select id from campaign_analytics
-        where campaign_id = ${cid}
-          and lower(email) = lower(${email})
-          and event_type = 'open'
-        limit 1
-      `;
-      if (existing.length === 0) {
-        await sql`insert into campaign_analytics (campaign_id, email, event_type)
-                  values (${cid}, ${email}, 'open')`;
-      }
+      await sql`insert into campaign_analytics (campaign_id, email, event_type)
+                values (${cid}, ${email}, 'open')`;
     } catch (err) {
-      console.error("track open error", err);
+      // Unique partial index prevents double-count; ignore conflicts.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/unique|duplicate/i.test(msg)) {
+        console.error("track open error", err);
+      }
     }
   }
 

@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { requireAuth } from "./_lib/auth";
 
 // POST /api/scrape — proxies allow-listed Firecrawl endpoints with the
 // FIRECRAWL_API_KEY held server-side (replaces the old client-side key).
 // Body: { path: "scrape"|"map"|"search", method?, query?, body? }.
 // Returns Firecrawl's upstream status + JSON unchanged.
-const BASE = "https://api.firecrawl.dev/v1";
+const BASE = "https://api.firecrawl.dev/v2";
 const ALLOWED = new Set(["scrape", "map", "search"]);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -12,7 +13,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { requireAuth } = await import("./_lib/auth");
   const auth = await requireAuth(req);
   if ("error" in auth) {
     return res.status(auth.status).json({ error: auth.error });

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,7 +10,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { emailTemplates, type EmailTemplate } from "@/lib/email-templates";
-import { Eye, Check } from "lucide-react";
+import {
+  listSavedTemplates,
+  savedToGalleryTemplate,
+  deleteSavedTemplate,
+} from "@/lib/user-templates";
+import { Eye, Check, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface TemplateGalleryProps {
   onSelectTemplate: (template: EmailTemplate) => void;
@@ -19,9 +24,26 @@ interface TemplateGalleryProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function TemplateGallery({ onSelectTemplate, open, onOpenChange }: TemplateGalleryProps) {
-  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
+export function TemplateGallery({
+  onSelectTemplate,
+  open,
+  onOpenChange,
+}: TemplateGalleryProps) {
+  const { toast } = useToast();
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<EmailTemplate | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [saved, setSaved] = useState<EmailTemplate[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    listSavedTemplates()
+      .then((rows) => setSaved(rows.map(savedToGalleryTemplate)))
+      .catch((err) => {
+        console.error(err);
+        setSaved([]);
+      });
+  }, [open]);
 
   const handlePreview = (template: EmailTemplate) => {
     setSelectedTemplate(template);
@@ -33,106 +55,160 @@ export function TemplateGallery({ onSelectTemplate, open, onOpenChange }: Templa
     onOpenChange(false);
   };
 
+  const handleDeleteSaved = async (id: string) => {
+    if (!confirm("Delete this saved template?")) return;
+    try {
+      await deleteSavedTemplate(id);
+      setSaved((prev) => prev.filter((t) => t.id !== id));
+      toast({ title: "Template deleted" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: err instanceof Error ? err.message : "Try again",
+      });
+    }
+  };
+
   const categories = {
-    all: emailTemplates,
-    newsletter: emailTemplates.filter(t => t.category === "newsletter"),
-    promotional: emailTemplates.filter(t => t.category === "promotional"),
-    transactional: emailTemplates.filter(t => t.category === "transactional"),
-    announcement: emailTemplates.filter(t => t.category === "announcement"),
+    all: [...saved, ...emailTemplates],
+    saved,
+    newsletter: emailTemplates.filter((t) => t.category === "newsletter"),
+    promotional: emailTemplates.filter((t) => t.category === "promotional"),
+    transactional: emailTemplates.filter((t) => t.category === "transactional"),
+    announcement: emailTemplates.filter((t) => t.category === "announcement"),
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Choose an Email Template</DialogTitle>
+            <DialogTitle>Templates</DialogTitle>
             <DialogDescription>
-              Select a professionally designed template to get started quickly
+              Starters and templates you’ve saved from the editor.
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="all" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="newsletter">Newsletter</TabsTrigger>
-              <TabsTrigger value="promotional">Promotional</TabsTrigger>
-              <TabsTrigger value="transactional">Transactional</TabsTrigger>
-              <TabsTrigger value="announcement">Announcement</TabsTrigger>
+            <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0">
+              {(
+                [
+                  ["all", "All"],
+                  ["saved", "Saved"],
+                  ["newsletter", "Newsletter"],
+                  ["promotional", "Promo"],
+                  ["transactional", "Transactional"],
+                  ["announcement", "Announce"],
+                ] as const
+              ).map(([value, label]) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="rounded-md border border-transparent px-2.5 py-1 text-xs data-[state=active]:border-border data-[state=active]:bg-muted"
+                >
+                  {label}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             {Object.entries(categories).map(([key, templates]) => (
-              <TabsContent key={key} value={key} className="mt-6">
-                <div className="grid grid-cols-2 gap-4">
-                  {templates.map((template) => (
-                    <Card key={template.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className="aspect-video bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-6xl">
-                        {template.thumbnail}
-                      </div>
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="font-semibold">{template.name}</h3>
-                            <Badge variant="outline" className="mt-1 text-xs">
+              <TabsContent key={key} value={key} className="mt-4">
+                {templates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {key === "saved"
+                      ? "No saved templates yet. Use Save template in the editor."
+                      : "No templates in this category."}
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-border rounded-md border border-border">
+                    {templates.map((template) => (
+                      <li
+                        key={template.id}
+                        className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold tracking-tight">
+                              {template.name}
+                            </h3>
+                            <Badge
+                              variant="outline"
+                              className="font-mono text-[10px] uppercase tracking-wide"
+                            >
                               {template.category}
                             </Badge>
                           </div>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {template.description}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {template.description}
-                        </p>
-                        <div className="flex gap-2">
+                        <div className="flex shrink-0 gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1"
+                            className="h-8"
                             onClick={() => handlePreview(template)}
                           >
-                            <Eye className="h-4 w-4 mr-2" />
+                            <Eye className="mr-1.5 h-3.5 w-3.5" />
                             Preview
                           </Button>
                           <Button
                             size="sm"
-                            className="flex-1"
+                            className="h-8"
                             onClick={() => handleSelectTemplate(template)}
                           >
-                            <Check className="h-4 w-4 mr-2" />
-                            Use Template
+                            <Check className="mr-1.5 h-3.5 w-3.5" />
+                            Use
                           </Button>
+                          {key === "saved" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleDeleteSaved(template.id)}
+                              aria-label="Delete template"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </TabsContent>
             ))}
           </Tabs>
         </DialogContent>
       </Dialog>
 
-      {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent className="max-h-[90vh] max-w-2xl">
           <DialogHeader>
             <DialogTitle>{selectedTemplate?.name}</DialogTitle>
-            <DialogDescription>{selectedTemplate?.description}</DialogDescription>
+            <DialogDescription>
+              {selectedTemplate?.description}
+            </DialogDescription>
           </DialogHeader>
-          <div className="border rounded-lg overflow-auto max-h-[60vh] bg-white">
-            {selectedTemplate && (
-              <div dangerouslySetInnerHTML={{ __html: selectedTemplate.html }} />
-            )}
-          </div>
+          <div
+            className="email-preview-body max-h-[60vh] overflow-auto rounded-md border border-border bg-card p-4"
+            dangerouslySetInnerHTML={{
+              __html: selectedTemplate?.html || "",
+            }}
+          />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>
               Close
             </Button>
             {selectedTemplate && (
-              <Button onClick={() => {
-                handleSelectTemplate(selectedTemplate);
-                setPreviewOpen(false);
-              }}>
-                <Check className="h-4 w-4 mr-2" />
-                Use This Template
+              <Button
+                onClick={() => {
+                  handleSelectTemplate(selectedTemplate);
+                  setPreviewOpen(false);
+                }}
+              >
+                Use template
               </Button>
             )}
           </div>
@@ -141,4 +217,3 @@ export function TemplateGallery({ onSelectTemplate, open, onOpenChange }: Templa
     </>
   );
 }
-

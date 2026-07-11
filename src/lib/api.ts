@@ -75,6 +75,8 @@ export async function addSubscriber(
   listId: string,
   subscriber: Partial<Subscriber>,
 ) {
+  const { assertCanAddSubscribers } = await import("./quota");
+  await assertCanAddSubscribers(1);
   const { data, error } = await supabase
     .from("subscribers")
     .insert([{ ...subscriber, list_id: listId }])
@@ -82,6 +84,16 @@ export async function addSubscriber(
     .single();
 
   if (error) throw error;
+
+  try {
+    const { enrollSubscribersInAutomations } = await import("./automations");
+    if (subscriber.email) {
+      await enrollSubscribersInAutomations(listId, [subscriber.email]);
+    }
+  } catch (err) {
+    console.warn("Automation enrollment skipped:", err);
+  }
+
   return data as Subscriber;
 }
 
